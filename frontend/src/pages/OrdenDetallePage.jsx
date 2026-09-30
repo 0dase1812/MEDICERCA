@@ -23,7 +23,7 @@ export default function OrdenDetallePage() {
       .then(async ([datosOrden, datosHistorial, misDomicilios]) => {
         setOrden(datosOrden)
         setHistorial(datosHistorial)
-        setDomicilio(misDomicilios.find((d) => d.orden_id === datosOrden.id) || null)
+        setDomicilio(misDomicilios.find((d) => d.orden_id === datosOrden.id && d.estado !== 'cancelado') || null)
         try {
           setMedicamento(await medicamentosApi.obtener(datosOrden.medicamento_id))
         } catch {

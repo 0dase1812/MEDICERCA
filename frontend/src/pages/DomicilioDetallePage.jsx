@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin, XCircle } from 'lucide-react'
 import { domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
-import { ESTADO_DOMICILIO, formatearFecha } from '../lib/format'
-import { Alert, Card, CenteredLoader, EstadoBadge } from '../components/ui'
+import { ESTADO_DOMICILIO, ESTADOS_DOMICILIO_CANCELABLES, formatearFecha } from '../lib/format'
+import { Alert, Button, Card, CenteredLoader, EstadoBadge } from '../components/ui'
 
 export default function DomicilioDetallePage() {
   const { ipsId, domicilioId } = useParams()
@@ -12,18 +12,39 @@ export default function DomicilioDetallePage() {
   const [historial, setHistorial] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [errorCancelar, setErrorCancelar] = useState('')
+  const [cancelando, setCancelando] = useState(false)
 
-  useEffect(() => {
+  const cargar = () => {
     setCargando(true)
     setError('')
-    Promise.all([domiciliosApi.obtener(ipsId, domicilioId), domiciliosApi.historial(ipsId, domicilioId)])
+    return Promise.all([domiciliosApi.obtener(ipsId, domicilioId), domiciliosApi.historial(ipsId, domicilioId)])
       .then(([datosDomicilio, datosHistorial]) => {
         setDomicilio(datosDomicilio)
         setHistorial(datosHistorial)
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudo cargar el domicilio.'))
       .finally(() => setCargando(false))
+  }
+
+  useEffect(() => {
+    cargar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ipsId, domicilioId])
+
+  const cancelar = async () => {
+    if (!window.confirm('¿Seguro que quieres cancelar este domicilio?')) return
+    setErrorCancelar('')
+    setCancelando(true)
+    try {
+      await domiciliosApi.cancelar(ipsId, domicilioId)
+      await cargar()
+    } catch (err) {
+      setErrorCancelar(err instanceof ApiError ? err.message : 'No se pudo cancelar el domicilio.')
+    } finally {
+      setCancelando(false)
+    }
+  }
 
   if (cargando) return <CenteredLoader label="Cargando domicilio…" />
   if (error) return <Alert variant="error">{error}</Alert>
@@ -47,6 +68,20 @@ export default function DomicilioDetallePage() {
             <MapPin className="h-5 w-5 text-brand-600" aria-hidden="true" />
             Última posición conocida: {domicilio.lat_actual}, {domicilio.lng_actual}
           </p>
+        )}
+
+        {ESTADOS_DOMICILIO_CANCELABLES.has(domicilio.estado) && (
+          <div className="mt-5">
+            <Button variant="destructive" loading={cancelando} onClick={cancelar}>
+              <XCircle className="h-5 w-5" aria-hidden="true" />
+              Cancelar domicilio
+            </Button>
+          </div>
+        )}
+        {errorCancelar && (
+          <div className="mt-3">
+            <Alert variant="error">{errorCancelar}</Alert>
+          </div>
         )}
       </Card>
 

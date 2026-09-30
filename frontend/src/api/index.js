@@ -43,6 +43,8 @@ export const domiciliosApi = {
     api.get(`/api/v1/domicilios/${ipsId}/${domicilioId}/historial`, undefined, { auth: true }),
   actualizarEstado: (ipsId, domicilioId, payload) =>
     api.patch(`/api/v1/domicilios/${ipsId}/${domicilioId}/estado`, payload, { auth: true }),
+  cancelar: (ipsId, domicilioId) =>
+    api.post(`/api/v1/domicilios/${ipsId}/${domicilioId}/cancelar`, undefined, { auth: true }),
 }
 
 export const historiaClinicaApi = {
