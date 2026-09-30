@@ -11,7 +11,7 @@ export default function Layout() {
       <footer className="border-t border-slate-200 bg-white py-7 text-center text-sm text-ink-soft print:hidden">
         <p className="font-semibold text-navy-800">MediCerca — Universidad Manuela Beltrán</p>
         <p className="mt-1">
-          Por Elkin Aldana, Sebastián Ñustes y Juan David Traslaviña · 2026 · Infraestructura tecnológica
+          Por Elkin Aldana, Sebastián Ñustes, Juan David Traslaviña y Derly Sánchez · 2026 · Infraestructura tecnológica
         </p>
       </footer>
     </div>
