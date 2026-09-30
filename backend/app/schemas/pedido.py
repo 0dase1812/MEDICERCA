@@ -1,17 +1,13 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models_ips import EstadoDomicilio, EstadoOrden
 
-
-class OrdenMedicaCreate(BaseModel):
-    ips_id: int
-    archivo_url: HttpUrl
-    # Medicamento que la fórmula ampara, tomado del catálogo central. Se exige
-    # aquí (y no se infiere después) para poder validar en la creación del
-    # domicilio que se está pidiendo exactamente lo que la orden autoriza.
-    medicamento_id: int
+# La orden ya no se crea con un payload JSON: el paciente sube el archivo
+# de la fórmula (imagen o PDF) como multipart/form-data — ver
+# app.api.v1.routes.ordenes.cargar_orden, que recibe Form(...)/File(...)
+# directamente en vez de un modelo Pydantic de request body.
 
 
 class OrdenMedicaOut(BaseModel):
@@ -22,6 +18,15 @@ class OrdenMedicaOut(BaseModel):
     estado: EstadoOrden
     revisado_por: str | None
     creado_en: datetime
+    aprobado_en: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HistorialEstadoOrdenOut(BaseModel):
+    estado: EstadoOrden
+    revisado_por: str | None
+    registrado_en: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

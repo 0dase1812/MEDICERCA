@@ -29,3 +29,8 @@ class Medicamento(Base):
     condicion_venta: Mapped[CondicionVenta] = mapped_column(Enum(CondicionVenta))
     control_especial: Mapped[bool] = mapped_column(Boolean, default=False)
     registro_sanitario: Mapped[str] = mapped_column(String(50))  # Ley 9 de 1979
+    # Información de posología para que el paciente sepa cómo tomarlo y cuánto
+    # le corresponde por entrega, sin tener que interpretar la orden médica.
+    indicaciones_uso: Mapped[str] = mapped_column(String(300))
+    cantidad_por_entrega: Mapped[str] = mapped_column(String(100))
+    duracion_tratamiento_dias: Mapped[int] = mapped_column(Integer)

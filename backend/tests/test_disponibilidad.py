@@ -19,6 +19,9 @@ def catalogo_e_inventario(db_session, ips_db) -> dict[str, int]:
             condicion_venta=CondicionVenta.OTC,
             control_especial=False,
             registro_sanitario="INVIMA-OTC-001",
+            indicaciones_uso="Tomar segun indicacion medica.",
+            cantidad_por_entrega="1 caja",
+            duracion_tratamiento_dias=30,
         ),
         "agotado": Medicamento(
             nombre_generico="Loratadina",
@@ -28,6 +31,9 @@ def catalogo_e_inventario(db_session, ips_db) -> dict[str, int]:
             condicion_venta=CondicionVenta.OTC,
             control_especial=False,
             registro_sanitario="INVIMA-OTC-002",
+            indicaciones_uso="Tomar segun indicacion medica.",
+            cantidad_por_entrega="1 caja",
+            duracion_tratamiento_dias=30,
         ),
     }
     db_session.add_all(medicamentos.values())

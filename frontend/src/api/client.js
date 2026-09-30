@@ -28,7 +28,11 @@ function toQuery(params) {
 async function request(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
   const finalHeaders = { ...headers }
   let finalBody
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // El navegador pone el Content-Type con el boundary correcto solo si
+    // no lo fijamos nosotros a mano.
+    finalBody = body
+  } else if (body !== undefined) {
     finalHeaders['Content-Type'] = 'application/json'
     finalBody = JSON.stringify(body)
   }

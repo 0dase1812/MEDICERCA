@@ -32,3 +32,24 @@ export function formatearFechaCorta(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('es-CO', { dateStyle: 'medium' })
 }
+
+/** "30" -> "30 días (~1 mes)", pensado para mostrar cuánto dura el
+ * tratamiento que ampara una entrega de medicamento. */
+export function formatearDuracionTratamiento(dias) {
+  if (!dias && dias !== 0) return '—'
+  if (dias >= 30) {
+    const meses = Math.round((dias / 30) * 10) / 10
+    const etiquetaMeses = Number.isInteger(meses) ? meses : meses.toFixed(1)
+    return `${dias} días (~${etiquetaMeses} ${meses === 1 ? 'mes' : 'meses'})`
+  }
+  return `${dias} día${dias === 1 ? '' : 's'}`
+}
+
+/** Fecha hasta la que es válida la autorización de entrega: fecha de
+ * aprobación de la orden + duración del tratamiento del medicamento. */
+export function calcularFechaVigencia(aprobadoEn, duracionDias) {
+  if (!aprobadoEn || !duracionDias) return null
+  const fecha = new Date(aprobadoEn)
+  fecha.setDate(fecha.getDate() + duracionDias)
+  return fecha.toISOString()
+}

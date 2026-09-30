@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from app.models.usuario import RolUsuario
 from app.models_ips import PuntoVenta
 
+from tests.conftest import archivo_formula_prueba
+
 
 def test_flujo_completo_registro_hasta_domicilio_entregado(
     client: TestClient, db_session, ips_db, token_factory
@@ -51,24 +53,26 @@ def test_flujo_completo_registro_hasta_domicilio_entregado(
             "condicion_venta": "RX",
             "control_especial": False,
             "registro_sanitario": "INVIMA-FLUJO-001",
+            "indicaciones_uso": "Tomar 1 tableta cada 24 horas.",
+            "cantidad_por_entrega": "2 cajas",
+            "duracion_tratamiento_dias": 60,
         },
         headers=regente_headers,
     )
     assert medicamento.status_code == 201
     medicamento_id = medicamento.json()["id"]
 
-    # 5. El paciente carga la formula medica que ampara ese medicamento.
+    # 5. El paciente carga la formula medica (un archivo real) que ampara ese medicamento.
     orden = client.post(
         "/api/v1/ordenes",
-        json={
-            "ips_id": 1,
-            "archivo_url": "https://ejemplo.test/formula-flujo.pdf",
-            "medicamento_id": medicamento_id,
-        },
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente_headers,
     )
     assert orden.status_code == 201
     assert orden.json()["estado"] == "pendiente"
+    assert orden.json()["archivo_url"].startswith("data:image/png;base64,")
+    assert orden.json()["aprobado_en"] is None
     orden_id = orden.json()["id"]
 
     # Punto de venta sembrado directamente (no existe endpoint publico para crearlo).

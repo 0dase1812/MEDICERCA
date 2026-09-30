@@ -2,6 +2,8 @@ from fastapi.testclient import TestClient
 
 from app.models.usuario import RolUsuario
 
+from tests.conftest import archivo_formula_prueba
+
 
 def _medicamento_payload() -> dict[str, object]:
     return {
@@ -12,6 +14,9 @@ def _medicamento_payload() -> dict[str, object]:
         "condicion_venta": "OTC",
         "control_especial": False,
         "registro_sanitario": "INVIMA-PRUEBA-001",
+        "indicaciones_uso": "Tomar 1 tableta cada 8 horas.",
+        "cantidad_por_entrega": "1 caja",
+        "duracion_tratamiento_dias": 10,
     }
 
 
@@ -53,7 +58,8 @@ def test_solo_regente_de_la_misma_ips_puede_aprobar_orden(client: TestClient, to
     paciente = token_factory(ips_id=1)
     orden = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente,
     )
     assert orden.status_code == 201
@@ -85,7 +91,8 @@ def test_solo_regente_de_la_misma_ips_puede_aprobar_orden(client: TestClient, to
 def test_no_se_puede_cargar_orden_con_medicamento_inexistente(client: TestClient, token_factory) -> None:
     response = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": 999999},
+        data={"ips_id": 1, "medicamento_id": 999999},
+        files=archivo_formula_prueba(),
         headers=token_factory(ips_id=1),
     )
 
@@ -97,7 +104,8 @@ def test_paciente_no_puede_subir_orden_a_otra_ips(client: TestClient, token_fact
     medicamento_id = _crear_medicamento(client, token_factory)
     response = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 2, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 2, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=token_factory(ips_id=1),
     )
 
@@ -112,12 +120,14 @@ def test_mis_ordenes_solo_devuelve_las_del_usuario_autenticado(client: TestClien
 
     client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente,
     )
     client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=otro_paciente,
     )
 
@@ -134,7 +144,8 @@ def test_ordenes_pendientes_solo_para_regente_y_filtra_por_estado(client: TestCl
 
     orden = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente,
     )
     orden_id = orden.json()["id"]
@@ -160,7 +171,8 @@ def test_obtener_orden_por_id_permite_dueno_y_regente_pero_no_a_otro_paciente(
     paciente = token_factory(cedula="4444444444", ips_id=1)
     orden = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente,
     )
     orden_id = orden.json()["id"]

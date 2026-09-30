@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Link2, Plus, Truck } from 'lucide-react'
+import { FileCheck2, FileText, Link2, Plus, Truck, Upload } from 'lucide-react'
 import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { ESTADO_ORDEN, formatearFecha } from '../lib/format'
-import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, Input, PageHeader, Select } from '../components/ui'
+import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
+
+const TIPOS_ARCHIVO_ACEPTADOS = 'image/jpeg,image/png,image/webp,application/pdf'
 
 function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onCreada }) {
   const [medicamentoId, setMedicamentoId] = useState(medicamentoIdInicial ? String(medicamentoIdInicial) : '')
-  const [archivoUrl, setArchivoUrl] = useState('')
+  const [archivo, setArchivo] = useState(null)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const inputArchivoRef = useRef(null)
 
   const enviar = async (evento) => {
     evento.preventDefault()
@@ -20,15 +23,20 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
       setError('Tu cuenta no tiene una IPS afiliada, así que no puedes cargar órdenes médicas.')
       return
     }
+    if (!archivo) {
+      setError('Selecciona una foto o un PDF de tu fórmula médica.')
+      return
+    }
     setEnviando(true)
     try {
-      const orden = await ordenesApi.crear({
-        ips_id: usuario.ips_id,
-        archivo_url: archivoUrl,
-        medicamento_id: Number(medicamentoId),
-      })
+      const formData = new FormData()
+      formData.append('ips_id', usuario.ips_id)
+      formData.append('medicamento_id', medicamentoId)
+      formData.append('archivo', archivo)
+      const orden = await ordenesApi.crear(formData)
       onCreada(orden)
-      setArchivoUrl('')
+      setArchivo(null)
+      if (inputArchivoRef.current) inputArchivoRef.current.value = ''
       setMedicamentoId('')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cargar la orden médica.')
@@ -41,7 +49,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
     <Card className="mb-6 !border-brand-100 !bg-brand-50">
       <h2 className="text-lg font-bold text-navy-800">Cargar nueva orden médica</h2>
       <p className="mt-1 text-base text-ink-soft">
-        Sube el enlace a tu fórmula médica escaneada. Un regente de tu IPS la revisará.
+        Sube una foto o un PDF de tu fórmula médica escaneada. Un regente de tu IPS la revisará.
       </p>
       <form className="mt-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={enviar}>
         <div className="min-w-56 flex-1">
@@ -55,16 +63,22 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
           </Select>
         </div>
         <div className="min-w-56 flex-1">
-          <Input
-            label="Enlace a la fórmula (URL)"
-            type="url"
-            required
-            placeholder="https://…"
-            value={archivoUrl}
-            onChange={(e) => setArchivoUrl(e.target.value)}
-          />
+          <label className="block" htmlFor="archivo-formula">
+            <span className="mb-1.5 block text-base font-semibold text-navy-800">Foto o PDF de la fórmula</span>
+            <input
+              id="archivo-formula"
+              ref={inputArchivoRef}
+              type="file"
+              required
+              accept={TIPOS_ARCHIVO_ACEPTADOS}
+              onChange={(e) => setArchivo(e.target.files?.[0] || null)}
+              className="block w-full min-h-12 cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-base text-ink shadow-sm outline-none transition file:mr-4 file:rounded-lg file:border-0 file:bg-brand-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-700 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+            />
+          </label>
+          <span className="mt-1.5 block text-sm text-ink-soft">JPG, PNG, WEBP o PDF · máximo 5 MB.</span>
         </div>
         <Button type="submit" loading={enviando}>
+          <Upload className="h-5 w-5" aria-hidden="true" />
           Cargar orden
         </Button>
       </form>
@@ -175,6 +189,15 @@ export default function OrdenesPage() {
                       <Truck className="h-5 w-5" aria-hidden="true" />
                       Pedir a domicilio
                     </Button>
+                  )}
+                  {orden.estado === 'aprobada' && (
+                    <Link
+                      to={`/ordenes/${usuario.ips_id}/${orden.id}/comprobante`}
+                      className="flex items-center gap-1.5 text-base font-semibold text-brand-700 hover:underline"
+                    >
+                      <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+                      Ver comprobante
+                    </Link>
                   )}
                   <Link
                     to={`/ordenes/${usuario.ips_id}/${orden.id}`}

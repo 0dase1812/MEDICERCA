@@ -25,10 +25,11 @@ export const disponibilidadApi = {
 }
 
 export const ordenesApi = {
-  crear: (payload) => api.post('/api/v1/ordenes', payload, { auth: true }),
+  crear: (formData) => api.post('/api/v1/ordenes', formData, { auth: true }),
   misOrdenes: () => api.get('/api/v1/ordenes/mias', undefined, { auth: true }),
   pendientes: () => api.get('/api/v1/ordenes/pendientes', undefined, { auth: true }),
   obtener: (ipsId, ordenId) => api.get(`/api/v1/ordenes/${ipsId}/${ordenId}`, undefined, { auth: true }),
+  historial: (ipsId, ordenId) => api.get(`/api/v1/ordenes/${ipsId}/${ordenId}/historial`, undefined, { auth: true }),
   aprobar: (ipsId, ordenId) => api.post(`/api/v1/ordenes/${ipsId}/${ordenId}/aprobar`, undefined, { auth: true }),
   rechazar: (ipsId, ordenId) => api.post(`/api/v1/ordenes/${ipsId}/${ordenId}/rechazar`, undefined, { auth: true }),
 }

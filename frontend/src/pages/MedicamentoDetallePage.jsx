@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Beaker, FileText, Layers, LocateFixed, MapPin, Search, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Beaker, Clock3, FileText, Layers, ListChecks, LocateFixed, MapPin, Package, Search, ShieldAlert } from 'lucide-react'
 import { disponibilidadApi, medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { NIVEL_DISPONIBILIDAD } from '../lib/format'
+import { formatearDuracionTratamiento, NIVEL_DISPONIBILIDAD } from '../lib/format'
 import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, EstadoBadge, Input } from '../components/ui'
 
 function useGeolocalizacion() {
@@ -126,6 +126,29 @@ export default function MedicamentoDetallePage() {
               <FileText className="h-4 w-4" aria-hidden="true" /> Registro sanitario
             </dt>
             <dd className="mt-1 font-semibold text-navy-800">{medicamento.registro_sanitario}</dd>
+          </div>
+        </dl>
+
+        <dl className="mt-6 grid gap-5 border-t border-slate-100 pt-6 text-base sm:grid-cols-3">
+          <div className="sm:col-span-3">
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <ListChecks className="h-4 w-4" aria-hidden="true" /> Indicaciones de uso
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">{medicamento.indicaciones_uso}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <Package className="h-4 w-4" aria-hidden="true" /> Cantidad por entrega
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">{medicamento.cantidad_por_entrega}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <Clock3 className="h-4 w-4" aria-hidden="true" /> Duración del tratamiento
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">
+              {formatearDuracionTratamiento(medicamento.duracion_tratamiento_dias)}
+            </dd>
           </div>
         </dl>
 

@@ -10,7 +10,7 @@ INVIMA), sin tener acceso directo a la base de datos del otro sistema.
 import enum
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.ips_db import IPSBase
@@ -90,7 +90,11 @@ class OrdenMedica(IPSBase):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     usuario_cedula: Mapped[str] = mapped_column(String(20), index=True)
-    archivo_url: Mapped[str] = mapped_column(String(300))
+    # Contiene la fórmula médica como "data URI" (imagen o PDF codificado en
+    # base64), no una URL externa: el paciente sube el archivo directamente,
+    # no lo aloja en otro lado. Text (no String) porque un archivo en base64
+    # fácilmente supera los límites de un varchar corto.
+    archivo_url: Mapped[str] = mapped_column(Text)
     # Referencia "suelta" (no FK real, igual que en Inventario) al medicamento del
     # catálogo central que ampara esta fórmula. Sin este campo, cualquier orden
     # aprobada podía usarse para pedir a domicilio CUALQUIER medicamento RX, no
@@ -100,8 +104,32 @@ class OrdenMedica(IPSBase):
     estado: Mapped[EstadoOrden] = mapped_column(Enum(EstadoOrden), default=EstadoOrden.PENDIENTE)
     revisado_por: Mapped[str | None] = mapped_column(String(120), nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Se llena solo al aprobar (no al crear ni al rechazar): junto con la
+    # duracion_tratamiento_dias del medicamento, permite calcular hasta cuándo
+    # es válida la autorización de entrega (ver comprobante en el frontend).
+    aprobado_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     domicilios: Mapped[list["Domicilio"]] = relationship(back_populates="orden")
+    historial: Mapped[list["HistorialEstadoOrden"]] = relationship(
+        back_populates="orden", order_by="HistorialEstadoOrden.registrado_en"
+    )
+
+
+class HistorialEstadoOrden(IPSBase):
+    """Registro append-only de cada cambio de estado de una orden médica
+    (pendiente -> aprobada/rechazada), con quién la revisó y cuándo. Igual
+    que HistorialEstadoDomicilio: nunca se edita ni se borra una fila
+    existente, solo se agregan nuevas, para poder reconstruir la trazabilidad
+    completa de la revisión de una fórmula."""
+    __tablename__ = "historial_estado_orden"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    orden_id: Mapped[int] = mapped_column(ForeignKey("orden_medica.id"), index=True)
+    estado: Mapped[EstadoOrden] = mapped_column(Enum(EstadoOrden))
+    revisado_por: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    registrado_en: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    orden: Mapped["OrdenMedica"] = relationship(back_populates="historial")
 
 
 class Domicilio(IPSBase):

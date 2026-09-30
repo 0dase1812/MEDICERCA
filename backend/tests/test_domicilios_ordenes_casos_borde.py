@@ -8,6 +8,8 @@ from app.models.medicamento import CondicionVenta, Medicamento
 from app.models.usuario import RolUsuario
 from app.models_ips import EstadoOrden, OrdenMedica, PuntoVenta
 
+from tests.conftest import archivo_formula_prueba
+
 
 def _crear_medicamento(db_session, *, rx: bool, sufijo: str) -> int:
     medicamento = Medicamento(
@@ -18,6 +20,9 @@ def _crear_medicamento(db_session, *, rx: bool, sufijo: str) -> int:
         condicion_venta=CondicionVenta.RX if rx else CondicionVenta.OTC,
         control_especial=False,
         registro_sanitario=f"INVIMA-{sufijo}",
+        indicaciones_uso="Tomar segun indicacion medica.",
+        cantidad_por_entrega="1 caja",
+        duracion_tratamiento_dias=30,
     )
     db_session.add(medicamento)
     db_session.commit()
@@ -76,7 +81,8 @@ def test_cargar_orden_sin_token_devuelve_401(client: TestClient, db_session) -> 
 
     response = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
     )
 
     assert response.status_code == 401
@@ -96,7 +102,8 @@ def test_usuario_sin_afiliacion_vigente_no_puede_cargar_orden(
 
     response = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "https://ejemplo.test/formula.pdf", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=token_factory(ips_id=None),
     )
 
