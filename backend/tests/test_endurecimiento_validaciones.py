@@ -161,3 +161,40 @@ def test_cargar_orden_acepta_imagen_valida_y_la_guarda_como_data_uri(
 
     assert response.status_code == 201
     assert response.json()["archivo_url"].startswith("data:image/png;base64,")
+
+
+# ---------------------------------------------------------------------------
+# registro_sanitario unico
+# ---------------------------------------------------------------------------
+
+def test_crear_medicamento_rechaza_registro_sanitario_duplicado(
+    client: TestClient, token_factory
+) -> None:
+    """Regresion: ya se duplico el mismo registro sanitario dos veces en
+    produccion por correr el mismo script mas de una vez; la base de datos
+    debe impedirlo con un error claro en vez de crear una fila repetida."""
+    from app.models.usuario import RolUsuario
+
+    regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    payload = {
+        "nombre_generico": "Paracetamol",
+        "nombre_comercial": "Generico A",
+        "dosis": "500 mg",
+        "presentacion": "Caja x 10 tabletas",
+        "condicion_venta": "OTC",
+        "control_especial": False,
+        "registro_sanitario": "INVIMA-DUPLICADO-001",
+        "indicaciones_uso": "Tomar segun indicacion medica.",
+        "cantidad_por_entrega": "1 caja",
+        "duracion_tratamiento_dias": 10,
+    }
+    primero = client.post("/api/v1/medicamentos", json=payload, headers=regente)
+    assert primero.status_code == 201
+
+    duplicado = client.post(
+        "/api/v1/medicamentos",
+        json={**payload, "nombre_comercial": "Generico B"},
+        headers=regente,
+    )
+    assert duplicado.status_code == 409
+    assert "INVIMA-DUPLICADO-001" in duplicado.json()["detail"]
