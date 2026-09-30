@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.deps import requerir_regente
@@ -43,6 +44,13 @@ def crear(
 ):
     medicamento = Medicamento(**payload.model_dump())
     db.add(medicamento)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un medicamento con el registro sanitario {payload.registro_sanitario!r}.",
+        )
     db.refresh(medicamento)
     return medicamento

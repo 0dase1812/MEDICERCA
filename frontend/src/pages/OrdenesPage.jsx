@@ -5,6 +5,7 @@ import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { ESTADO_ORDEN, formatearFecha } from '../lib/format'
+import { comprimirImagenSiAplica } from '../lib/imagen'
 import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
 
 const TIPOS_ARCHIVO_ACEPTADOS = 'image/jpeg,image/png,image/webp,application/pdf'
@@ -14,6 +15,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
   const [archivo, setArchivo] = useState(null)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [comprimiendo, setComprimiendo] = useState(false)
   const inputArchivoRef = useRef(null)
 
   const enviar = async (evento) => {
@@ -29,10 +31,13 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
     }
     setEnviando(true)
     try {
+      setComprimiendo(true)
+      const archivoFinal = await comprimirImagenSiAplica(archivo)
+      setComprimiendo(false)
       const formData = new FormData()
       formData.append('ips_id', usuario.ips_id)
       formData.append('medicamento_id', medicamentoId)
-      formData.append('archivo', archivo)
+      formData.append('archivo', archivoFinal)
       const orden = await ordenesApi.crear(formData)
       onCreada(orden)
       setArchivo(null)
@@ -41,6 +46,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cargar la orden médica.')
     } finally {
+      setComprimiendo(false)
       setEnviando(false)
     }
   }
@@ -79,7 +85,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
         </div>
         <Button type="submit" loading={enviando}>
           <Upload className="h-5 w-5" aria-hidden="true" />
-          Cargar orden
+          {comprimiendo ? 'Comprimiendo imagen…' : 'Cargar orden'}
         </Button>
       </form>
       {error && (

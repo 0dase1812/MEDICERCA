@@ -28,7 +28,10 @@ class Medicamento(Base):
     presentacion: Mapped[str] = mapped_column(String(80))
     condicion_venta: Mapped[CondicionVenta] = mapped_column(Enum(CondicionVenta))
     control_especial: Mapped[bool] = mapped_column(Boolean, default=False)
-    registro_sanitario: Mapped[str] = mapped_column(String(50))  # Ley 9 de 1979
+    # Ley 9 de 1979. Unico: ya se duplico dos veces en produccion por correr
+    # el mismo script de seed/migracion mas de una vez, asi que la base de
+    # datos misma debe impedirlo en vez de confiar en que nadie se equivoque.
+    registro_sanitario: Mapped[str] = mapped_column(String(50), unique=True)
     # Información de posología para que el paciente sepa cómo tomarlo y cuánto
     # le corresponde por entrega, sin tener que interpretar la orden médica.
     indicaciones_uso: Mapped[str] = mapped_column(String(300))
