@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { FileCheck2, FileText, Link2, Plus, Truck, Upload } from 'lucide-react'
-import { medicamentosApi, ordenesApi } from '../api'
+import { domiciliosApi, medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { ESTADO_ORDEN, formatearFecha } from '../lib/format'
+import { ESTADO_DOMICILIO, ESTADO_ORDEN, formatearFecha } from '../lib/format'
 import { comprimirImagenSiAplica } from '../lib/imagen'
 import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
 
@@ -103,19 +103,26 @@ export default function OrdenesPage() {
   const navigate = useNavigate()
   const [ordenes, setOrdenes] = useState([])
   const [medicamentos, setMedicamentos] = useState([])
+  const [domicilios, setDomicilios] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(Boolean(location.state?.medicamentoId))
 
   const medicamentosPorId = useMemo(() => new Map(medicamentos.map((m) => [m.id, m])), [medicamentos])
+  const domicilioPorOrdenId = useMemo(() => new Map(domicilios.map((d) => [d.orden_id, d])), [domicilios])
 
   const cargar = async () => {
     setCargando(true)
     setError('')
     try {
-      const [misOrdenes, pagina] = await Promise.all([ordenesApi.misOrdenes(), medicamentosApi.listar({ limit: 200 })])
+      const [misOrdenes, pagina, misDomicilios] = await Promise.all([
+        ordenesApi.misOrdenes(),
+        medicamentosApi.listar({ limit: 200 }),
+        domiciliosApi.misDomicilios(),
+      ])
       setOrdenes(misOrdenes)
       setMedicamentos(pagina.items)
+      setDomicilios(misDomicilios)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus órdenes.')
     } finally {
@@ -167,6 +174,7 @@ export default function OrdenesPage() {
         <div className="flex flex-col gap-4">
           {ordenes.map((orden) => {
             const medicamento = medicamentosPorId.get(orden.medicamento_id)
+            const domicilio = domicilioPorOrdenId.get(orden.id)
             return (
               <Card key={orden.id} className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -183,7 +191,16 @@ export default function OrdenesPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <EstadoBadge config={ESTADO_ORDEN[orden.estado]} />
-                  {orden.estado === 'aprobada' && !medicamento?.control_especial && (
+                  {orden.estado === 'aprobada' && !medicamento?.control_especial && domicilio && (
+                    <Link
+                      to={`/domicilios/${usuario.ips_id}/${domicilio.id}`}
+                      className="flex items-center gap-1.5 text-base font-semibold text-brand-700 hover:underline"
+                    >
+                      <Truck className="h-4 w-4" aria-hidden="true" />
+                      Domicilio <EstadoBadge config={ESTADO_DOMICILIO[domicilio.estado]} />
+                    </Link>
+                  )}
+                  {orden.estado === 'aprobada' && !medicamento?.control_especial && !domicilio && (
                     <Button
                       variant="secondary"
                       onClick={() =>

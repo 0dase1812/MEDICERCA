@@ -207,6 +207,32 @@ def test_medicamento_otc_no_requiere_orden_aprobada_para_domicilio(
     assert response.json()["estado"] == "confirmado"
 
 
+def test_no_se_puede_pedir_dos_domicilios_con_la_misma_orden(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    """Una orden aprobada ampara UNA sola entrega: pedir un segundo domicilio
+    reutilizando la misma orden debe rechazarse, no crear otro pedido."""
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="DOSDOMI")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="1010101010")
+    punto_id = _crear_punto_venta(ips_db)
+    paciente = token_factory(cedula="1010101010", ips_id=1)
+
+    primero = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    assert primero.status_code == 201
+
+    segundo = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    assert segundo.status_code == 422
+    assert "ya tiene un domicilio" in segundo.json()["detail"].lower()
+
+
 # ---------------------------------------------------------------------------
 # Lectura y actualizacion de estado (sin tests previos)
 # ---------------------------------------------------------------------------

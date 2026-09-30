@@ -53,6 +53,15 @@ def crear_domicilio(
             )
         if not db.get(PuntoVenta, payload.punto_origen_id):
             raise HTTPException(status_code=404, detail="Punto de origen no encontrado en esa IPS")
+        # Una orden aprobada ampara UNA sola entrega: sin este chequeo, el
+        # mismo paciente podria pedir el mismo medicamento a domicilio
+        # varias veces reusando la misma orden ya aprobada.
+        ya_tiene_domicilio = db.query(Domicilio).filter(Domicilio.orden_id == orden.id).first()
+        if ya_tiene_domicilio:
+            raise HTTPException(
+                status_code=422,
+                detail="Esta orden médica ya tiene un domicilio asociado.",
+            )
         try:
             validar_domicilio_o_falla(medicamento, orden.estado == EstadoOrden.APROBADA)
         except MedicamentoNoElegibleParaDomicilio as exc:

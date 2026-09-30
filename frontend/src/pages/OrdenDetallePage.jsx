@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CalendarCheck, ExternalLink, FileCheck2, Truck, UserCheck } from 'lucide-react'
-import { medicamentosApi, ordenesApi } from '../api'
+import { domiciliosApi, medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
-import { calcularFechaVigencia, ESTADO_ORDEN, formatearFecha, formatearFechaCorta } from '../lib/format'
+import { calcularFechaVigencia, ESTADO_DOMICILIO, ESTADO_ORDEN, formatearFecha, formatearFechaCorta } from '../lib/format'
 import { Alert, Button, Card, CenteredLoader, EstadoBadge } from '../components/ui'
 
 export default function OrdenDetallePage() {
@@ -12,16 +12,18 @@ export default function OrdenDetallePage() {
   const [orden, setOrden] = useState(null)
   const [medicamento, setMedicamento] = useState(null)
   const [historial, setHistorial] = useState([])
+  const [domicilio, setDomicilio] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     setCargando(true)
     setError('')
-    Promise.all([ordenesApi.obtener(ipsId, ordenId), ordenesApi.historial(ipsId, ordenId)])
-      .then(async ([datosOrden, datosHistorial]) => {
+    Promise.all([ordenesApi.obtener(ipsId, ordenId), ordenesApi.historial(ipsId, ordenId), domiciliosApi.misDomicilios()])
+      .then(async ([datosOrden, datosHistorial, misDomicilios]) => {
         setOrden(datosOrden)
         setHistorial(datosHistorial)
+        setDomicilio(misDomicilios.find((d) => d.orden_id === datosOrden.id) || null)
         try {
           setMedicamento(await medicamentosApi.obtener(datosOrden.medicamento_id))
         } catch {
@@ -115,7 +117,13 @@ export default function OrdenDetallePage() {
               <FileCheck2 className="h-5 w-5" aria-hidden="true" />
               Ver comprobante de autorización
             </Button>
-            {!medicamento?.control_especial && (
+            {!medicamento?.control_especial && domicilio && (
+              <Button onClick={() => navigate(`/domicilios/${ipsId}/${domicilio.id}`)}>
+                <Truck className="h-5 w-5" aria-hidden="true" />
+                Ver domicilio <EstadoBadge config={ESTADO_DOMICILIO[domicilio.estado]} className="ml-1" />
+              </Button>
+            )}
+            {!medicamento?.control_especial && !domicilio && (
               <Button onClick={() => navigate('/domicilios/nuevo', { state: { orden, medicamento } })}>
                 <Truck className="h-5 w-5" aria-hidden="true" />
                 Pedir a domicilio
