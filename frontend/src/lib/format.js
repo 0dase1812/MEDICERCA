@@ -14,7 +14,12 @@ export const ESTADO_DOMICILIO = {
   en_alistamiento: { etiqueta: 'En alistamiento', color: 'yellow', icono: PackageSearch },
   en_camino: { etiqueta: 'En camino', color: 'blue', icono: Truck },
   entregado: { etiqueta: 'Entregado', color: 'green', icono: CheckCircle2 },
+  cancelado: { etiqueta: 'Cancelado', color: 'red', icono: XCircle },
 }
+
+/** Mientras el domicilio esté en uno de estos estados, el paciente todavía
+ * puede cancelarlo — una vez sale en camino ya no tiene sentido. */
+export const ESTADOS_DOMICILIO_CANCELABLES = new Set(['confirmado', 'en_alistamiento'])
 
 export const NIVEL_DISPONIBILIDAD = {
   punto_mas_cercano: { etiqueta: 'Punto más cercano', color: 'green', icono: MapPin },

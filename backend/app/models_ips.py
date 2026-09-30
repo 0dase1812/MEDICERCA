@@ -82,6 +82,7 @@ class EstadoDomicilio(str, enum.Enum):
     EN_ALISTAMIENTO = "en_alistamiento"
     EN_CAMINO = "en_camino"
     ENTREGADO = "entregado"
+    CANCELADO = "cancelado"
 
 
 class OrdenMedica(IPSBase):

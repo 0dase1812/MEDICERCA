@@ -55,8 +55,14 @@ def crear_domicilio(
             raise HTTPException(status_code=404, detail="Punto de origen no encontrado en esa IPS")
         # Una orden aprobada ampara UNA sola entrega: sin este chequeo, el
         # mismo paciente podria pedir el mismo medicamento a domicilio
-        # varias veces reusando la misma orden ya aprobada.
-        ya_tiene_domicilio = db.query(Domicilio).filter(Domicilio.orden_id == orden.id).first()
+        # varias veces reusando la misma orden ya aprobada. Un domicilio
+        # CANCELADO no cuenta: si el paciente lo cancelo, la orden queda
+        # libre para pedirlo de nuevo.
+        ya_tiene_domicilio = (
+            db.query(Domicilio)
+            .filter(Domicilio.orden_id == orden.id, Domicilio.estado != EstadoDomicilio.CANCELADO)
+            .first()
+        )
         if ya_tiene_domicilio:
             raise HTTPException(
                 status_code=422,
@@ -115,7 +121,7 @@ def domicilios_activos(
     with ips_session(ips) as db:
         domicilios = (
             db.query(Domicilio)
-            .filter(Domicilio.estado != EstadoDomicilio.ENTREGADO)
+            .filter(Domicilio.estado.notin_([EstadoDomicilio.ENTREGADO, EstadoDomicilio.CANCELADO]))
             .order_by(Domicilio.id)
             .all()
         )
@@ -157,6 +163,32 @@ def obtener_historial(
         for fila in filas:
             db.expunge(fila)
         return filas
+
+
+@router.post("/{ips_id}/{domicilio_id}/cancelar", response_model=DomicilioOut)
+def cancelar(
+    ips_id: int,
+    domicilio_id: int,
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """El paciente dueño del pedido puede cancelarlo mientras todavía no
+    salió en camino. Una vez en camino o entregado, ya no tiene sentido
+    (el punto de venta ya alistó o despachó el medicamento)."""
+    ips, _ = _obtener_domicilio_del_usuario(db_central, usuario, ips_id, domicilio_id)
+    with ips_session(ips) as db:
+        domicilio = db.get(Domicilio, domicilio_id)
+        if domicilio.estado in (EstadoDomicilio.EN_CAMINO, EstadoDomicilio.ENTREGADO, EstadoDomicilio.CANCELADO):
+            raise HTTPException(
+                status_code=422,
+                detail="Este domicilio ya no se puede cancelar (ya salió en camino, fue entregado o ya estaba cancelado).",
+            )
+        domicilio.estado = EstadoDomicilio.CANCELADO
+        db.add(HistorialEstadoDomicilio(domicilio_id=domicilio.id, estado=domicilio.estado))
+        db.commit()
+        db.refresh(domicilio)
+        db.expunge(domicilio)
+        return domicilio
 
 
 @router.patch("/{ips_id}/{domicilio_id}/estado", response_model=DomicilioOut)

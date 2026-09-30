@@ -109,7 +109,10 @@ export default function OrdenesPage() {
   const [mostrarFormulario, setMostrarFormulario] = useState(Boolean(location.state?.medicamentoId))
 
   const medicamentosPorId = useMemo(() => new Map(medicamentos.map((m) => [m.id, m])), [medicamentos])
-  const domicilioPorOrdenId = useMemo(() => new Map(domicilios.map((d) => [d.orden_id, d])), [domicilios])
+  const domicilioPorOrdenId = useMemo(
+    () => new Map(domicilios.filter((d) => d.estado !== 'cancelado').map((d) => [d.orden_id, d])),
+    [domicilios],
+  )
 
   const cargar = async () => {
     setCargando(true)

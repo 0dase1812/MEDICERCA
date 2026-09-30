@@ -233,6 +233,63 @@ def test_no_se_puede_pedir_dos_domicilios_con_la_misma_orden(
     assert "ya tiene un domicilio" in segundo.json()["detail"].lower()
 
 
+def test_paciente_puede_cancelar_domicilio_y_volver_a_pedirlo(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    """El paciente dueño puede cancelar mientras el domicilio sigue
+    confirmado, y una vez cancelado la orden queda libre para pedirlo de
+    nuevo (no se queda bloqueada para siempre)."""
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="CANCELA")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="1010101010")
+    punto_id = _crear_punto_venta(ips_db)
+    paciente = token_factory(cedula="1010101010", ips_id=1)
+
+    creado = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    domicilio_id = creado.json()["id"]
+
+    cancelado = client.post(f"/api/v1/domicilios/1/{domicilio_id}/cancelar", headers=paciente)
+    assert cancelado.status_code == 200
+    assert cancelado.json()["estado"] == "cancelado"
+
+    otro_paciente = token_factory(cedula="3030303030", ips_id=1)
+    ajeno = client.post(f"/api/v1/domicilios/1/{domicilio_id}/cancelar", headers=otro_paciente)
+    assert ajeno.status_code == 403
+
+    nuevo = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    assert nuevo.status_code == 201
+    assert nuevo.json()["id"] != domicilio_id
+
+
+def test_no_se_puede_cancelar_un_domicilio_ya_en_camino(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="NOCANCEL")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="1010101010")
+    punto_id = _crear_punto_venta(ips_db)
+    paciente = token_factory(cedula="1010101010", ips_id=1)
+
+    creado = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    domicilio_id = creado.json()["id"]
+
+    regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "en_camino"}, headers=regente)
+
+    respuesta = client.post(f"/api/v1/domicilios/1/{domicilio_id}/cancelar", headers=paciente)
+    assert respuesta.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # Lectura y actualizacion de estado (sin tests previos)
 # ---------------------------------------------------------------------------
