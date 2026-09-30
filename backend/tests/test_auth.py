@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app.config import settings
+from app.models.medicamento import CondicionVenta, Medicamento
+from tests.conftest import archivo_formula_prueba
 
 
 def _registro_payload(**cambios: object) -> dict[str, object]:
@@ -223,19 +225,35 @@ def test_admin_crea_regente_con_clave_valida_y_rechaza_clave_invalida(client: Te
 
 
 def test_logout_revoca_el_token_y_ya_no_sirve_para_endpoints_protegidos(
-    client: TestClient, token_factory
+    client: TestClient, db_session, token_factory
 ) -> None:
-    headers = token_factory()
+    medicamento = Medicamento(
+        nombre_generico="Medicamento Logout",
+        nombre_comercial="Comercial Logout",
+        dosis="500 mg",
+        presentacion="Tabletas x 10",
+        condicion_venta=CondicionVenta.OTC,
+        control_especial=False,
+        registro_sanitario="INVIMA-LOGOUT-001",
+        indicaciones_uso="Tomar segun indicacion medica.",
+        cantidad_por_entrega="1 caja",
+        duracion_tratamiento_dias=30,
+    )
+    db_session.add(medicamento)
+    db_session.commit()
+    db_session.refresh(medicamento)
 
-    # Un endpoint protegido funciona antes del logout (401 solo si el token falla;
-    # aquí puede dar 400/422 por el payload mínimo, lo que importa es que NO sea 401).
-    antes = client.post("/api/v1/ordenes", headers=headers, json={"archivo_url": "https://x.com/a.pdf"})
+    headers = token_factory(ips_id=1)
+    payload_orden = {"ips_id": 1, "medicamento_id": medicamento.id}
+
+    # Un endpoint protegido funciona antes del logout.
+    antes = client.post("/api/v1/ordenes", headers=headers, data=payload_orden, files=archivo_formula_prueba())
     assert antes.status_code != 401
 
     logout = client.post("/api/v1/auth/logout", headers=headers)
     assert logout.status_code == 204
 
-    despues = client.post("/api/v1/ordenes", headers=headers, json={"archivo_url": "https://x.com/a.pdf"})
+    despues = client.post("/api/v1/ordenes", headers=headers, data=payload_orden, files=archivo_formula_prueba())
     assert despues.status_code == 401
 
     # Idempotente: repetir logout con el mismo token (ya revocado) no debe explotar.

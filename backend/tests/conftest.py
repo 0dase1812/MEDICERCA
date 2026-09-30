@@ -19,6 +19,20 @@ def _sqlite_url(name: str) -> str:
     return f"sqlite:///{(_TEST_DB_DIR / name).as_posix()}?check_same_thread=False"
 
 
+# PNG válido mínimo (1x1 transparente), para probar POST /api/v1/ordenes
+# ahora que recibe un archivo real (multipart/form-data) en vez de una URL.
+ARCHIVO_PRUEBA_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+    b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def archivo_formula_prueba(nombre: str = "formula.png", content_type: str = "image/png"):
+    """Dict listo para pasarle a TestClient como `files=` al cargar una orden."""
+    return {"archivo": (nombre, ARCHIVO_PRUEBA_PNG, content_type)}
+
+
 # Must be defined before importing any app module.
 os.environ["DATABASE_URL"] = _sqlite_url("central.sqlite3")
 os.environ["DATABASE_URL_IPS_1"] = _sqlite_url("ips_1.sqlite3")

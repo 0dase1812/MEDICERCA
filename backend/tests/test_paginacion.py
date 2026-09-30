@@ -15,6 +15,9 @@ def _crear_medicamentos(db_session, cantidad: int) -> list[int]:
             condicion_venta=CondicionVenta.OTC,
             control_especial=False,
             registro_sanitario=f"INVIMA-PAG-{i:03d}",
+            indicaciones_uso="Tomar segun indicacion medica.",
+            cantidad_por_entrega="1 caja",
+            duracion_tratamiento_dias=30,
         )
         for i in range(cantidad)
     ]

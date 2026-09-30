@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Truck, UserCheck } from 'lucide-react'
+import { ArrowLeft, CalendarCheck, ExternalLink, FileCheck2, Truck, UserCheck } from 'lucide-react'
 import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
-import { ESTADO_ORDEN, formatearFecha } from '../lib/format'
+import { calcularFechaVigencia, ESTADO_ORDEN, formatearFecha, formatearFechaCorta } from '../lib/format'
 import { Alert, Button, Card, CenteredLoader, EstadoBadge } from '../components/ui'
 
 export default function OrdenDetallePage() {
@@ -11,18 +11,19 @@ export default function OrdenDetallePage() {
   const navigate = useNavigate()
   const [orden, setOrden] = useState(null)
   const [medicamento, setMedicamento] = useState(null)
+  const [historial, setHistorial] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     setCargando(true)
     setError('')
-    ordenesApi
-      .obtener(ipsId, ordenId)
-      .then(async (datos) => {
-        setOrden(datos)
+    Promise.all([ordenesApi.obtener(ipsId, ordenId), ordenesApi.historial(ipsId, ordenId)])
+      .then(async ([datosOrden, datosHistorial]) => {
+        setOrden(datosOrden)
+        setHistorial(datosHistorial)
         try {
-          setMedicamento(await medicamentosApi.obtener(datos.medicamento_id))
+          setMedicamento(await medicamentosApi.obtener(datosOrden.medicamento_id))
         } catch {
           setMedicamento(null)
         }
@@ -34,6 +35,8 @@ export default function OrdenDetallePage() {
   if (cargando) return <CenteredLoader label="Cargando orden…" />
   if (error) return <Alert variant="error">{error}</Alert>
   if (!orden) return null
+
+  const fechaVigencia = calcularFechaVigencia(orden.aprobado_en, medicamento?.duracion_tratamiento_dias)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -62,6 +65,16 @@ export default function OrdenDetallePage() {
             </dt>
             <dd className="mt-1 font-semibold text-navy-800">{orden.revisado_por || 'Pendiente de revisión'}</dd>
           </div>
+          {orden.estado === 'aprobada' && (
+            <div>
+              <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+                <CalendarCheck className="h-4 w-4" aria-hidden="true" /> Válida hasta
+              </dt>
+              <dd className="mt-1 font-semibold text-navy-800">
+                {fechaVigencia ? formatearFechaCorta(fechaVigencia) : '—'}
+              </dd>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <dt className="text-sm font-semibold text-ink-soft">Fórmula médica</dt>
             <dd>
@@ -96,14 +109,36 @@ export default function OrdenDetallePage() {
           </div>
         )}
 
-        {orden.estado === 'aprobada' && !medicamento?.control_especial && (
-          <div className="mt-5">
-            <Button onClick={() => navigate('/domicilios/nuevo', { state: { orden, medicamento } })}>
-              <Truck className="h-5 w-5" aria-hidden="true" />
-              Pedir a domicilio
+        {orden.estado === 'aprobada' && (
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => navigate(`/ordenes/${ipsId}/${ordenId}/comprobante`)}>
+              <FileCheck2 className="h-5 w-5" aria-hidden="true" />
+              Ver comprobante de autorización
             </Button>
+            {!medicamento?.control_especial && (
+              <Button onClick={() => navigate('/domicilios/nuevo', { state: { orden, medicamento } })}>
+                <Truck className="h-5 w-5" aria-hidden="true" />
+                Pedir a domicilio
+              </Button>
+            )}
           </div>
         )}
+      </Card>
+
+      <Card className="mt-6">
+        <h2 className="text-lg font-bold text-navy-800">Historial de revisión</h2>
+        <ol className="mt-5 flex flex-col gap-5 border-l-2 border-brand-200 pl-5">
+          {historial.map((paso, indice) => (
+            <li key={indice} className="relative">
+              <span className="absolute -left-[1.65rem] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <EstadoBadge config={ESTADO_ORDEN[paso.estado]} />
+                <span className="text-sm font-medium text-ink-soft">{formatearFecha(paso.registrado_en)}</span>
+              </div>
+              {paso.revisado_por && <p className="mt-1.5 text-sm text-ink-soft">Por {paso.revisado_por}</p>}
+            </li>
+          ))}
+        </ol>
       </Card>
     </div>
   )

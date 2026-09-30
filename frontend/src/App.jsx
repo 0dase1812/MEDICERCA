@@ -12,6 +12,7 @@ import MedicamentoDetallePage from './pages/MedicamentoDetallePage'
 import MiCuentaPage from './pages/MiCuentaPage'
 import OrdenesPage from './pages/OrdenesPage'
 import OrdenDetallePage from './pages/OrdenDetallePage'
+import OrdenComprobantePage from './pages/OrdenComprobantePage'
 import CrearDomicilioPage from './pages/CrearDomicilioPage'
 import DomiciliosPage from './pages/DomiciliosPage'
 import DomicilioDetallePage from './pages/DomicilioDetallePage'
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/historia-clinica" element={<HistoriaClinicaPage />} />
           <Route path="/ordenes" element={<OrdenesPage />} />
           <Route path="/ordenes/:ipsId/:ordenId" element={<OrdenDetallePage />} />
+          <Route path="/ordenes/:ipsId/:ordenId/comprobante" element={<OrdenComprobantePage />} />
           <Route path="/domicilios/nuevo" element={<CrearDomicilioPage />} />
           <Route path="/domicilios" element={<DomiciliosPage />} />
           <Route path="/domicilios/:ipsId/:domicilioId" element={<DomicilioDetallePage />} />

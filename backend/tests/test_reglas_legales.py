@@ -14,6 +14,9 @@ def _crear_medicamentos_legales(db_session) -> dict[str, int]:
             condicion_venta=CondicionVenta.RX,
             control_especial=False,
             registro_sanitario="INVIMA-RX-001",
+            indicaciones_uso="Tomar segun indicacion medica.",
+            cantidad_por_entrega="1 caja",
+            duracion_tratamiento_dias=30,
         ),
         "control": Medicamento(
             nombre_generico="Medicamento Controlado",
@@ -23,6 +26,9 @@ def _crear_medicamentos_legales(db_session) -> dict[str, int]:
             condicion_venta=CondicionVenta.RX,
             control_especial=True,
             registro_sanitario="INVIMA-CTRL-001",
+            indicaciones_uso="Tomar segun indicacion medica.",
+            cantidad_por_entrega="1 caja",
+            duracion_tratamiento_dias=30,
         ),
     }
     db_session.add_all(medicamentos.values())
@@ -113,6 +119,9 @@ def test_domicilio_no_permite_medicamento_distinto_al_amparado_por_la_orden(
         condicion_venta=CondicionVenta.RX,
         control_especial=False,
         registro_sanitario="INVIMA-RX-002",
+        indicaciones_uso="Tomar segun indicacion medica.",
+        cantidad_por_entrega="1 caja",
+        duracion_tratamiento_dias=30,
     )
     db_session.add(otro_rx)
     db_session.commit()

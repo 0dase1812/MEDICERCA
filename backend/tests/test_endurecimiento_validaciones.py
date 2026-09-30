@@ -1,10 +1,12 @@
 """Tests del endurecimiento de validaciones de entrada agregado en esta
 sesion: rango de lat/lng (-90/90, -180/180) en disponibilidad y domicilios,
-y archivo_url como HttpUrl (en vez de str libre) al cargar una orden."""
+y tipo/tamaño del archivo (imagen o PDF) al cargar una orden."""
 from fastapi.testclient import TestClient
 
 from app.models.medicamento import CondicionVenta, Medicamento
 from app.models_ips import EstadoOrden, OrdenMedica, PuntoVenta
+
+from tests.conftest import archivo_formula_prueba
 
 
 def _crear_medicamento(db_session, *, sufijo: str) -> int:
@@ -16,6 +18,9 @@ def _crear_medicamento(db_session, *, sufijo: str) -> int:
         condicion_venta=CondicionVenta.OTC,
         control_especial=False,
         registro_sanitario=f"INVIMA-{sufijo}",
+        indicaciones_uso="Tomar segun indicacion medica.",
+        cantidad_por_entrega="1 caja",
+        duracion_tratamiento_dias=30,
     )
     db_session.add(medicamento)
     db_session.commit()
@@ -100,42 +105,59 @@ def test_actualizar_estado_domicilio_rechaza_lat_actual_fuera_de_rango(
 
 
 # ---------------------------------------------------------------------------
-# archivo_url como HttpUrl
+# tipo/tamaño del archivo al cargar una orden
 # ---------------------------------------------------------------------------
 
-def test_cargar_orden_rechaza_archivo_url_que_no_es_una_url(
+def test_cargar_orden_rechaza_tipo_de_archivo_no_soportado(
     client: TestClient, db_session, token_factory
 ) -> None:
-    medicamento_id = _crear_medicamento(db_session, sufijo="URLBAD")
+    medicamento_id = _crear_medicamento(db_session, sufijo="TIPOBAD")
     paciente = token_factory(cedula="1010101010", ips_id=1)
 
     response = client.post(
         "/api/v1/ordenes",
-        json={"ips_id": 1, "archivo_url": "no-es-una-url", "medicamento_id": medicamento_id},
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files={"archivo": ("formula.txt", b"no es una imagen ni un pdf", "text/plain")},
         headers=paciente,
     )
 
     assert response.status_code == 422
+    assert "formato" in response.json()["detail"].lower()
 
 
-def test_cargar_orden_acepta_archivo_url_https_valida(
+def test_cargar_orden_rechaza_archivo_mayor_a_5mb(
     client: TestClient, db_session, token_factory
 ) -> None:
-    """Regresion: el cambio a HttpUrl no debe romper el caso normal, y el
-    valor guardado debe quedar como texto plano (no el objeto Url de
-    pydantic) en la respuesta y en la base de datos de la IPS."""
-    medicamento_id = _crear_medicamento(db_session, sufijo="URLOK")
+    medicamento_id = _crear_medicamento(db_session, sufijo="TAMANOBAD")
+    paciente = token_factory(cedula="1010101010", ips_id=1)
+
+    archivo_muy_grande = b"0" * (5 * 1024 * 1024 + 1)
+    response = client.post(
+        "/api/v1/ordenes",
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files={"archivo": ("formula.png", archivo_muy_grande, "image/png")},
+        headers=paciente,
+    )
+
+    assert response.status_code == 413
+    assert "5 mb" in response.json()["detail"].lower()
+
+
+def test_cargar_orden_acepta_imagen_valida_y_la_guarda_como_data_uri(
+    client: TestClient, db_session, token_factory
+) -> None:
+    """Regresion: el cambio de URL externa a archivo subido debe guardar el
+    contenido codificado en base64 como "data URI", listo para mostrarse
+    directo en el navegador sin depender de almacenamiento externo."""
+    medicamento_id = _crear_medicamento(db_session, sufijo="ARCHIVOOK")
     paciente = token_factory(cedula="1010101010", ips_id=1)
 
     response = client.post(
         "/api/v1/ordenes",
-        json={
-            "ips_id": 1,
-            "archivo_url": "https://ejemplo.test/formula.pdf",
-            "medicamento_id": medicamento_id,
-        },
+        data={"ips_id": 1, "medicamento_id": medicamento_id},
+        files=archivo_formula_prueba(),
         headers=paciente,
     )
 
     assert response.status_code == 201
-    assert response.json()["archivo_url"] == "https://ejemplo.test/formula.pdf"
+    assert response.json()["archivo_url"].startswith("data:image/png;base64,")

@@ -106,3 +106,22 @@ body {
     0 0 0 1px rgb(22 119 184 / 8%),
     0 20px 40px -16px rgb(18 59 93 / 25%);
 }
+
+/* Impresión del comprobante de autorización de entrega: solo el contenido
+   de la tarjeta debe quedar en el PDF/papel, sin navbar ni pie de página. */
+@media print {
+  nav,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  body {
+    background-color: #fff;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+}

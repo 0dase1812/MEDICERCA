@@ -30,10 +30,53 @@ def cargar() -> None:
         obtener_o_crear(db, EPS, nombre_ficticio="Salud Total Simulada")
         obtener_o_crear(db, EPS, nombre_ficticio="Nueva Vida EPS (ficticia)")
 
+        # (clave, registro_sanitario, nombre_generico, nombre_comercial, dosis,
+        #  presentacion, condicion_venta, control_especial, indicaciones_uso,
+        #  cantidad_por_entrega, duracion_tratamiento_dias).
+        # Las primeras tres claves (acetaminofen/losartan/tramadol) se
+        # referencian mas abajo para el inventario y la historia clinica de
+        # demo — no cambiar esas claves sin actualizar esas referencias. Las
+        # demas solo pueblan el catalogo (no tienen inventario asociado).
+        catalogo = [
+            ("acetaminofen", "INVIMA-SIM-0001", "Acetaminofen", "Dolex", "500 mg", "Caja x 20 tabletas", CondicionVenta.OTC, False, "Tomar 1 tableta cada 8 horas si hay dolor o fiebre.", "1 caja", 10),
+            ("losartan", "INVIMA-SIM-0002", "Losartan", "Cozaar", "50 mg", "Caja x 30 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 24 horas, con o sin alimentos.", "2 cajas", 60),
+            ("tramadol", "INVIMA-SIM-0003", "Tramadol", "Tramal", "50 mg", "Caja x 10 capsulas", CondicionVenta.RX, True, "Tomar 1 capsula cada 8 horas, maximo 5 dias seguidos.", "1 caja", 5),
+            ("ibuprofeno", "INVIMA-SIM-0004", "Ibuprofeno", "Advil", "400 mg", "Caja x 30 tabletas", CondicionVenta.OTC, False, "Tomar 1 tableta cada 8 horas con alimentos.", "1 caja", 10),
+            ("amoxicilina", "INVIMA-SIM-0005", "Amoxicilina", "Amoxil", "500 mg", "Caja x 21 capsulas", CondicionVenta.RX, False, "Tomar 1 capsula cada 8 horas durante 7 dias completos.", "1 caja", 7),
+            ("metformina", "INVIMA-SIM-0006", "Metformina", "Glucophage", "850 mg", "Caja x 30 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 12 horas con las comidas.", "2 cajas", 60),
+            ("omeprazol", "INVIMA-SIM-0007", "Omeprazol", "Losec", "20 mg", "Caja x 14 capsulas", CondicionVenta.OTC, False, "Tomar 1 capsula en ayunas cada 24 horas.", "2 cajas", 30),
+            ("loratadina", "INVIMA-SIM-0008", "Loratadina", "Clarityne", "10 mg", "Caja x 10 tabletas", CondicionVenta.OTC, False, "Tomar 1 tableta cada 24 horas.", "1 caja", 10),
+            ("cetirizina", "INVIMA-SIM-0009", "Cetirizina", "Zyrtec", "10 mg", "Caja x 20 tabletas", CondicionVenta.OTC, False, "Tomar 1 tableta cada 24 horas.", "1 caja", 20),
+            ("diclofenaco", "INVIMA-SIM-0010", "Diclofenaco", "Voltaren", "50 mg", "Caja x 20 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 12 horas con alimentos.", "1 caja", 10),
+            ("atorvastatina", "INVIMA-SIM-0011", "Atorvastatina", "Lipitor", "20 mg", "Caja x 30 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 24 horas en la noche.", "3 cajas", 90),
+            ("salbutamol", "INVIMA-SIM-0012", "Salbutamol", "Ventolin", "100 mcg/dosis", "Inhalador x 200 dosis", CondicionVenta.RX, False, "2 inhalaciones cada 6 a 8 horas si hay dificultad respiratoria.", "1 inhalador", 30),
+            ("enalapril", "INVIMA-SIM-0013", "Enalapril", "Renitec", "10 mg", "Caja x 30 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 12 horas.", "2 cajas", 60),
+            ("clonazepam", "INVIMA-SIM-0014", "Clonazepam", "Rivotril", "2 mg", "Caja x 30 tabletas", CondicionVenta.RX, True, "Tomar 1 tableta en la noche, unicamente bajo supervision medica.", "1 caja", 30),
+            ("morfina", "INVIMA-SIM-0015", "Morfina", "MST Continus", "30 mg", "Caja x 20 tabletas", CondicionVenta.RX, True, "Tomar segun indicacion estricta y exclusiva del medico tratante.", "1 caja", 15),
+            ("diazepam", "INVIMA-SIM-0016", "Diazepam", "Valium", "10 mg", "Caja x 20 tabletas", CondicionVenta.RX, True, "Tomar 1 tableta cada 12 horas, uso estrictamente controlado.", "1 caja", 15),
+            ("vitamina_c", "INVIMA-SIM-0017", "Acido ascorbico", "Redoxon", "1 g", "Tubo x 10 tabletas efervescentes", CondicionVenta.OTC, False, "Disolver 1 tableta en agua cada 24 horas.", "2 tubos", 20),
+            ("complejo_b", "INVIMA-SIM-0018", "Complejo B", "Bedoyecta", "Multivitaminico", "Caja x 30 tabletas", CondicionVenta.OTC, False, "Tomar 1 tableta cada 24 horas.", "1 caja", 30),
+            ("azitromicina", "INVIMA-SIM-0019", "Azitromicina", "Zithromax", "500 mg", "Caja x 3 tabletas", CondicionVenta.RX, False, "Tomar 1 tableta cada 24 horas durante 3 dias completos.", "1 caja", 3),
+            ("insulina_glargina", "INVIMA-SIM-0020", "Insulina glargina", "Lantus", "100 U/mL", "Vial x 10 mL", CondicionVenta.RX, False, "Aplicar via subcutanea segun indicacion medica, cada 24 horas.", "1 vial", 30),
+        ]
         medicamentos = {
-            "acetaminofen": obtener_o_crear(db, Medicamento, registro_sanitario="INVIMA-SIM-0001", defaults={"nombre_generico": "Acetaminofen", "nombre_comercial": "Dolex", "dosis": "500 mg", "presentacion": "Caja x 20 tabletas", "condicion_venta": CondicionVenta.OTC, "control_especial": False}),
-            "losartan": obtener_o_crear(db, Medicamento, registro_sanitario="INVIMA-SIM-0002", defaults={"nombre_generico": "Losartan", "nombre_comercial": "Cozaar", "dosis": "50 mg", "presentacion": "Caja x 30 tabletas", "condicion_venta": CondicionVenta.RX, "control_especial": False}),
-            "tramadol": obtener_o_crear(db, Medicamento, registro_sanitario="INVIMA-SIM-0003", defaults={"nombre_generico": "Tramadol", "nombre_comercial": "Tramal", "dosis": "50 mg", "presentacion": "Caja x 10 capsulas", "condicion_venta": CondicionVenta.RX, "control_especial": True}),
+            clave: obtener_o_crear(
+                db,
+                Medicamento,
+                registro_sanitario=registro,
+                defaults={
+                    "nombre_generico": generico,
+                    "nombre_comercial": comercial,
+                    "dosis": dosis,
+                    "presentacion": presentacion,
+                    "condicion_venta": condicion,
+                    "control_especial": control_especial,
+                    "indicaciones_uso": indicaciones,
+                    "cantidad_por_entrega": cantidad_entrega,
+                    "duracion_tratamiento_dias": duracion_dias,
+                },
+            )
+            for clave, registro, generico, comercial, dosis, presentacion, condicion, control_especial, indicaciones, cantidad_entrega, duracion_dias in catalogo
         }
         db.commit()
         # Los objetos de `medicamentos` se van a usar mas abajo, ya con

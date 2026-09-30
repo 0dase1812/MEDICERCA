@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import base64
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.afiliaciones import exigir_ips_del_usuario, obtener_ips_vigente_usuario
@@ -7,33 +10,62 @@ from app.database import get_db
 from app.ips_db import ips_session
 from app.models.medicamento import Medicamento
 from app.models.usuario import RolUsuario, Usuario
-from app.models_ips import EstadoOrden, OrdenMedica
-from app.schemas.pedido import OrdenMedicaCreate, OrdenMedicaOut
+from app.models_ips import EstadoOrden, HistorialEstadoOrden, OrdenMedica
+from app.schemas.pedido import HistorialEstadoOrdenOut, OrdenMedicaOut
 
 router = APIRouter(prefix="/api/v1/ordenes", tags=["ordenes"])
 
+# La fórmula se sube como archivo (no como link a otro sitio), así que se
+# valida tipo y tamaño acá — sin esto, cualquiera podría subir un ejecutable
+# o un archivo de varios GB directo a la base de datos.
+TIPOS_ARCHIVO_PERMITIDOS = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024  # 5 MB
+
 
 @router.post("", response_model=OrdenMedicaOut, status_code=201)
-def cargar_orden(
-    payload: OrdenMedicaCreate,
+async def cargar_orden(
+    ips_id: int = Form(...),
+    medicamento_id: int = Form(...),
+    archivo: UploadFile = File(..., description="Foto o PDF de la fórmula médica"),
     db_central: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ):
-    """Carga una formula solamente en la IPS vigente del paciente."""
-    ips = exigir_ips_del_usuario(db_central, usuario, payload.ips_id)
-    if not db_central.get(Medicamento, payload.medicamento_id):
+    """Carga una formula solamente en la IPS vigente del paciente.
+
+    El archivo llega como multipart/form-data (no como URL externa): se
+    valida tipo/tamaño y se guarda codificado en base64 ("data URI"), listo
+    para mostrarse o descargarse directo desde el navegador sin depender de
+    ningún almacenamiento externo.
+    """
+    ips = exigir_ips_del_usuario(db_central, usuario, ips_id)
+    if not db_central.get(Medicamento, medicamento_id):
         raise HTTPException(status_code=404, detail="Medicamento no encontrado en el catalogo")
+
+    if archivo.content_type not in TIPOS_ARCHIVO_PERMITIDOS:
+        raise HTTPException(
+            status_code=422,
+            detail="Formato no soportado. Sube una imagen (JPG, PNG, WEBP) o un PDF.",
+        )
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(status_code=422, detail="El archivo está vacío.")
+    if len(contenido) > TAMANO_MAXIMO_BYTES:
+        raise HTTPException(status_code=413, detail="El archivo no puede superar 5 MB.")
+
+    data_uri = f"data:{archivo.content_type};base64,{base64.b64encode(contenido).decode()}"
+
     with ips_session(ips) as db:
         orden = OrdenMedica(
             usuario_cedula=usuario.cedula,
-            # payload.archivo_url es HttpUrl (pydantic-core Url), no str: hay
-            # que convertirlo explicitamente o SQLAlchemy intenta bindear un
-            # objeto no soportado por el driver de la BD.
-            archivo_url=str(payload.archivo_url),
-            medicamento_id=payload.medicamento_id,
+            archivo_url=data_uri,
+            medicamento_id=medicamento_id,
             estado=EstadoOrden.PENDIENTE,
         )
         db.add(orden)
+        db.flush()
+        # Primer registro del historial, igual que con los domicilios: así la
+        # trazabilidad siempre arranca completa desde la carga, sin huecos.
+        db.add(HistorialEstadoOrden(orden_id=orden.id, estado=orden.estado))
         db.commit()
         db.refresh(orden)
         db.expunge(orden)
@@ -104,6 +136,34 @@ def obtener_orden(
         return orden
 
 
+@router.get("/{ips_id}/{orden_id}/historial", response_model=list[HistorialEstadoOrdenOut])
+def obtener_historial_orden(
+    ips_id: int,
+    orden_id: int,
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Línea de tiempo completa de la revisión de una orden (cargada ->
+    aprobada/rechazada), con quién la revisó y cuándo. Mismo control de
+    acceso que su endpoint hermano GET /{ips_id}/{orden_id}."""
+    ips = exigir_ips_del_usuario(db_central, usuario, ips_id)
+    with ips_session(ips) as db:
+        orden = db.get(OrdenMedica, orden_id)
+        if not orden:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+        if usuario.rol != RolUsuario.REGENTE and orden.usuario_cedula != usuario.cedula:
+            raise HTTPException(status_code=403, detail="No tienes acceso a esta orden")
+        filas = (
+            db.query(HistorialEstadoOrden)
+            .filter(HistorialEstadoOrden.orden_id == orden_id)
+            .order_by(HistorialEstadoOrden.registrado_en)
+            .all()
+        )
+        for fila in filas:
+            db.expunge(fila)
+        return filas
+
+
 @router.post("/{ips_id}/{orden_id}/aprobar", response_model=OrdenMedicaOut)
 def aprobar_orden(
     ips_id: int,
@@ -118,6 +178,8 @@ def aprobar_orden(
             raise HTTPException(status_code=404, detail="Orden no encontrada")
         orden.estado = EstadoOrden.APROBADA
         orden.revisado_por = usuario.nombre
+        orden.aprobado_en = datetime.now(timezone.utc)
+        db.add(HistorialEstadoOrden(orden_id=orden.id, estado=orden.estado, revisado_por=usuario.nombre))
         db.commit()
         db.refresh(orden)
         db.expunge(orden)
@@ -138,6 +200,7 @@ def rechazar_orden(
             raise HTTPException(status_code=404, detail="Orden no encontrada")
         orden.estado = EstadoOrden.RECHAZADA
         orden.revisado_por = usuario.nombre
+        db.add(HistorialEstadoOrden(orden_id=orden.id, estado=orden.estado, revisado_por=usuario.nombre))
         db.commit()
         db.refresh(orden)
         db.expunge(orden)
