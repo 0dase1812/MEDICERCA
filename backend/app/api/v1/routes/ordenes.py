@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.afiliaciones import exigir_ips_del_usuario, obtener_ips_vigente_usuario
 from app.core.deps import get_current_user
+from app.core.email import enviar_correo
 from app.database import get_db
 from app.ips_db import ips_session
 from app.models.medicamento import Medicamento
@@ -183,7 +184,8 @@ def aprobar_orden(
         db.commit()
         db.refresh(orden)
         db.expunge(orden)
-        return orden
+    _notificar_cambio_orden(db_central, orden, "Tu orden médica fue aprobada")
+    return orden
 
 
 @router.post("/{ips_id}/{orden_id}/rechazar", response_model=OrdenMedicaOut)
@@ -204,10 +206,22 @@ def rechazar_orden(
         db.commit()
         db.refresh(orden)
         db.expunge(orden)
-        return orden
+    _notificar_cambio_orden(db_central, orden, "Tu orden médica fue rechazada")
+    return orden
 
 
 def _validar_regente_de_su_ips(db_central: Session, usuario: Usuario, ips_id: int):
     if usuario.rol != RolUsuario.REGENTE:
         raise HTTPException(status_code=403, detail="Esta accion requiere rol de regente")
     return exigir_ips_del_usuario(db_central, usuario, ips_id)
+
+
+def _notificar_cambio_orden(db_central: Session, orden: OrdenMedica, asunto: str) -> None:
+    paciente = db_central.query(Usuario).filter(Usuario.cedula == orden.usuario_cedula).first()
+    if not paciente:
+        return
+    enviar_correo(
+        paciente.correo,
+        asunto,
+        f"<p>Hola {paciente.nombre},</p><p>{asunto} (orden #{orden.id}).</p>",
+    )

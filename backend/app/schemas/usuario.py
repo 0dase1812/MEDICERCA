@@ -16,6 +16,9 @@ class UsuarioCreate(BaseModel):
     password: str
     eps_id: int | None = None
     ips_id: int | None = None
+    # Token que devuelve el widget de reCAPTCHA en el navegador. Si el
+    # servidor no tiene una clave secreta configurada, se ignora.
+    captcha_token: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -72,6 +75,7 @@ class ConfirmarCambioPasswordRequest(BaseModel):
 class LoginRequest(BaseModel):
     correo: EmailStr
     password: str
+    captcha_token: str | None = None
 
 
 class Token(BaseModel):

@@ -32,8 +32,8 @@ export function AuthProvider({ children }) {
     cargarUsuario()
   }, [cargarUsuario])
 
-  const login = async (correo, password) => {
-    const datos = await authApi.login({ correo, password })
+  const login = async (correo, password, captchaToken) => {
+    const datos = await authApi.login({ correo, password, captcha_token: captchaToken })
     guardarToken(datos.access_token)
     setToken(datos.access_token)
     await cargarUsuario()

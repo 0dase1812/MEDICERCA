@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 8
     email_modo: str = "simulado"
 
+    # reCAPTCHA v2 (Google). Si queda vacio, no se verifica nada (local/pruebas);
+    # en produccion se configura con una clave real para proteger registro y login.
+    recaptcha_secret_key: str = ""
+
+    # Correo real (Brevo). Si queda vacio, no se envia nada (mismo criterio que
+    # email_modo="simulado": util para desarrollo sin necesitar una cuenta real).
+    brevo_api_key: str = ""
+    email_remitente: str = "no-responder@medicerca.demo"
+    email_remitente_nombre: str = "MediCerca"
+
     # Clave compartida para los endpoints de administración (ej. crear regentes).
     # No es un reemplazo de un sistema de roles de admin real, es un mínimo viable
     # mientras el modelo de datos solo distingue paciente/regente.

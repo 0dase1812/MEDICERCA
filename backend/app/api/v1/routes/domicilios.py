@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.afiliaciones import exigir_ips_del_usuario, obtener_ips_vigente_usuario
 from app.core.deps import get_current_user
+from app.core.email import enviar_correo
 from app.core.legal_rules import MedicamentoNoElegibleParaDomicilio, validar_domicilio_o_falla
 from app.database import get_db
 from app.ips_db import ips_session
@@ -226,4 +227,27 @@ def actualizar_estado(
         db.commit()
         db.refresh(domicilio)
         db.expunge(domicilio)
-        return domicilio
+        orden = db.get(OrdenMedica, domicilio.orden_id)
+        cedula_paciente = orden.usuario_cedula if orden else None
+    if cedula_paciente:
+        _notificar_cambio_domicilio(db_central, cedula_paciente, domicilio)
+    return domicilio
+
+
+def _notificar_cambio_domicilio(db_central: Session, cedula_paciente: str, domicilio: Domicilio) -> None:
+    paciente = db_central.query(Usuario).filter(Usuario.cedula == cedula_paciente).first()
+    if not paciente:
+        return
+    etiquetas = {
+        EstadoDomicilio.EN_ALISTAMIENTO: "está en alistamiento",
+        EstadoDomicilio.EN_CAMINO: "ya está en camino",
+        EstadoDomicilio.ENTREGADO: "fue entregado",
+    }
+    descripcion = etiquetas.get(domicilio.estado)
+    if not descripcion:
+        return
+    enviar_correo(
+        paciente.correo,
+        "Actualización de tu domicilio en MediCerca",
+        f"<p>Hola {paciente.nombre},</p><p>Tu domicilio #{domicilio.id} {descripcion}.</p>",
+    )

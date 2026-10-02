@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { UserPlus } from 'lucide-react'
 import { authApi, ipsApi } from '../api'
 import { ApiError } from '../api/client'
+import Captcha from '../components/Captcha'
 import { Alert, Button, Card, Input, Select } from '../components/ui'
 import DecorativeBackdrop from '../components/DecorativeBackdrop'
 
@@ -14,6 +15,8 @@ export default function RegisterPage() {
   const [ipsDisponibles, setIpsDisponibles] = useState([])
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaRef = useRef(null)
 
   useEffect(() => {
     ipsApi
@@ -36,11 +39,14 @@ export default function RegisterPage() {
         password: form.password,
         ips_id: form.ips_id ? Number(form.ips_id) : null,
         eps_id: form.eps_id ? Number(form.eps_id) : null,
+        captcha_token: captchaToken,
       }
       const respuesta = await authApi.registrar(payload)
       navigate('/verificar-correo', { state: { correo: form.correo, codigoDemo: respuesta.codigo_demo } })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo completar el registro.')
+      captchaRef.current?.reiniciar()
+      setCaptchaToken('')
     } finally {
       setEnviando(false)
     }
@@ -96,6 +102,8 @@ export default function RegisterPage() {
             value={form.eps_id}
             onChange={actualizarCampo('eps_id')}
           />
+
+          <Captcha ref={captchaRef} onCambio={setCaptchaToken} />
 
           {error && <Alert variant="error">{error}</Alert>}
 

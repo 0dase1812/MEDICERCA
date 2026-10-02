@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.afiliaciones import cambiar_afiliacion, obtener_ips_activa
+from app.core.captcha import CaptchaInvalido, verificar_captcha
 from app.core.deps import get_current_user, security_scheme
+from app.core.email import enviar_correo
 from app.core.otp import generar_codigo, validar_codigo
 from app.core.rate_limit import limiter
 from app.core.security import (
@@ -49,6 +51,11 @@ def _codigo_demo(codigo: str) -> str | None:
 @router.post("/register", response_model=RegistroOut, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
 def registrar(request: Request, payload: UsuarioCreate, db: Session = Depends(get_db)):
+    try:
+        verificar_captcha(payload.captcha_token)
+    except CaptchaInvalido as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     existe = db.query(Usuario).filter(Usuario.correo == payload.correo).first()
     if existe:
         raise HTTPException(status_code=400, detail="Ya existe un usuario con ese correo")
@@ -79,6 +86,11 @@ def registrar(request: Request, payload: UsuarioCreate, db: Session = Depends(ge
     db.refresh(usuario)
 
     codigo = generar_codigo(db, correo=usuario.correo, proposito=PropositoCodigo.REGISTRO)
+    enviar_correo(
+        usuario.correo,
+        "Confirma tu cuenta en MediCerca",
+        f"<p>Hola {usuario.nombre},</p><p>Tu código de verificación es: <strong>{codigo}</strong></p>",
+    )
 
     return RegistroOut(
         usuario=usuario,
@@ -107,6 +119,11 @@ def verificar_registro(request: Request, payload: VerificarCodigoRequest, db: Se
 @router.post("/login", response_model=Token)
 @limiter.limit("20/minute")
 def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
+    try:
+        verificar_captcha(payload.captcha_token)
+    except CaptchaInvalido as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     usuario = db.query(Usuario).filter(Usuario.correo == payload.correo).first()
 
     ahora = datetime.now(timezone.utc)
@@ -154,6 +171,12 @@ def solicitar_cambio_password(request: Request, payload: SolicitarCambioPassword
         return SolicitarCambioPasswordOut(mensaje="Si el correo existe, se envió un código de verificación.")
 
     codigo = generar_codigo(db, correo=payload.correo, proposito=PropositoCodigo.CAMBIO_PASSWORD)
+    enviar_correo(
+        usuario.correo,
+        "Código para cambiar tu contraseña en MediCerca",
+        f"<p>Tu código para cambiar la contraseña es: <strong>{codigo}</strong></p>"
+        "<p>Si no fuiste tú quien lo solicitó, ignora este correo.</p>",
+    )
     return SolicitarCambioPasswordOut(
         mensaje="Si el correo existe, se envió un código de verificación.",
         codigo_demo=_codigo_demo(codigo),
