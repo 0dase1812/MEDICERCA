@@ -73,7 +73,7 @@ export function Input({ label, error, hint, className = '', id, ...props }) {
   )
 }
 
-export function Select({ label, error, hint, children, className = '', id, ...props }) {
+export function Select({ label, error, hint, children, className = '', id, multiple, ...props }) {
   const fieldId = id || props.name
   return (
     <label className="block" htmlFor={fieldId}>
@@ -81,13 +81,18 @@ export function Select({ label, error, hint, children, className = '', id, ...pr
       <div className="relative">
         <select
           id={fieldId}
-          className={`${FIELD_BASE} appearance-none pr-11 ${error ? 'border-danger-600 focus:border-danger-600 focus:ring-red-100' : 'border-slate-200'} ${className}`}
+          multiple={multiple}
+          className={`${FIELD_BASE} appearance-none ${multiple ? '' : 'pr-11'} ${error ? 'border-danger-600 focus:border-danger-600 focus:ring-red-100' : 'border-slate-200'} ${className}`}
           aria-invalid={error ? 'true' : undefined}
           {...props}
         >
           {children}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
+        {/* El selector multiple es una lista, no un desplegable: la flechita
+            solo tiene sentido en el modo de selección unica. */}
+        {!multiple && (
+          <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
+        )}
       </div>
       {hint && !error && <span className="mt-1.5 block text-sm text-ink-soft">{hint}</span>}
       {error && (

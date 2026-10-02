@@ -19,6 +19,7 @@ import DomicilioDetallePage from './pages/DomicilioDetallePage'
 import HistoriaClinicaPage from './pages/HistoriaClinicaPage'
 import RegenteOrdenesPage from './pages/RegenteOrdenesPage'
 import RegenteDomiciliosPage from './pages/RegenteDomiciliosPage'
+import RegenteHistoriaClinicaPage from './pages/RegenteHistoriaClinicaPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         <Route element={<RutaRegente />}>
           <Route path="/regente/ordenes" element={<RegenteOrdenesPage />} />
           <Route path="/regente/domicilios" element={<RegenteDomiciliosPage />} />
+          <Route path="/regente/historia-clinica" element={<RegenteHistoriaClinicaPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />
