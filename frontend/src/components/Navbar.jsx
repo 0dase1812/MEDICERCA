@@ -40,6 +40,7 @@ export default function Navbar() {
     { to: '/catalogo', label: 'Catálogo', icon: Pill },
     { to: '/regente/ordenes', label: 'Órdenes por aprobar', icon: ClipboardCheck },
     { to: '/regente/domicilios', label: 'Domicilios activos', icon: Truck },
+    { to: '/regente/historia-clinica', label: 'Historia clínica', icon: Stethoscope },
   ]
 
   const enlaces = autenticado ? (esRegente ? enlacesRegente : enlacesPaciente) : [{ to: '/catalogo', label: 'Catálogo', icon: Pill }]

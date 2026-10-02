@@ -49,4 +49,5 @@ export const domiciliosApi = {
 
 export const historiaClinicaApi = {
   mia: () => api.get('/api/v1/historia-clinica/mia', undefined, { auth: true }),
+  registrar: (ipsId, payload) => api.post(`/api/v1/historia-clinica/${ipsId}`, payload, { auth: true }),
 }
