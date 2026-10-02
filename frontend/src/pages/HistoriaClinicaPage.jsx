@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileHeart, Stethoscope } from 'lucide-react'
+import { FileHeart, Printer, Stethoscope } from 'lucide-react'
 import { historiaClinicaApi, medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { formatearFecha, formatearFechaCorta } from '../lib/format'
-import { Alert, Badge, Card, CenteredLoader, EmptyState, PageHeader } from '../components/ui'
+import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, PageHeader } from '../components/ui'
 
 export default function HistoriaClinicaPage() {
+  const { usuario } = useAuth()
   const [historia, setHistoria] = useState(null)
   const [medicamentos, setMedicamentos] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -35,7 +37,23 @@ export default function HistoriaClinicaPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader icon={Stethoscope} title="Mi historia clínica" description="Información clínica simulada dentro de tu IPS." />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader icon={Stethoscope} title="Mi historia clínica" description="Información clínica simulada dentro de tu IPS." />
+        {historia && !sinHistoria && (
+          <div className="print:hidden">
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="h-5 w-5" aria-hidden="true" />
+              Imprimir / Guardar como PDF
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {historia && !sinHistoria && (
+        <p className="mb-6 hidden text-sm text-ink-soft print:block">
+          {usuario?.nombre} · Cédula {usuario?.cedula}
+        </p>
+      )}
 
       {error && <Alert variant="error">{error}</Alert>}
 

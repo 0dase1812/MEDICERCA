@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../api/client'
+import Captcha from '../components/Captcha'
 import { Alert, Button, Card, Input } from '../components/ui'
 import DecorativeBackdrop from '../components/DecorativeBackdrop'
 
@@ -14,16 +15,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaRef = useRef(null)
 
   const enviar = async (evento) => {
     evento.preventDefault()
     setError('')
     setEnviando(true)
     try {
-      await login(correo, password)
+      await login(correo, password, captchaToken)
       navigate(location.state?.from || '/')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesión.')
+      captchaRef.current?.reiniciar()
+      setCaptchaToken('')
     } finally {
       setEnviando(false)
     }
@@ -56,6 +61,8 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+
+          <Captcha ref={captchaRef} onCambio={setCaptchaToken} />
 
           {error && <Alert variant="error">{error}</Alert>}
 

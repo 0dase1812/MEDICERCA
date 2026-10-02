@@ -10,3 +10,4 @@ bcrypt<4.1  # passlib 1.7.x no reconoce bcrypt>=4.1 (rompe el hashing)
 python-multipart>=0.0.9
 alembic>=1.14
 slowapi>=0.1.9
+httpx>=0.27  # captcha (Google) y correo real (Brevo)
