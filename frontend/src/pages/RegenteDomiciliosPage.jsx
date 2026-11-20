@@ -4,12 +4,14 @@ import { RefreshCw, Truck } from 'lucide-react'
 import { domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { ESTADO_DOMICILIO } from '../lib/format'
+import { ahoraLegible, ESTADO_DOMICILIO } from '../lib/format'
+import { useToast } from '../components/Toast'
 import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
 
 const ESTADOS = ['confirmado', 'en_alistamiento', 'en_camino', 'entregado']
 
 function FilaDomicilio({ domicilio, ipsId, onActualizado }) {
+  const toast = useToast()
   const [nuevoEstado, setNuevoEstado] = useState(domicilio.estado)
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
@@ -25,8 +27,11 @@ function FilaDomicilio({ domicilio, ipsId, onActualizado }) {
       if (lng !== '') payload.lng_actual = Number(lng)
       const actualizado = await domiciliosApi.actualizarEstado(ipsId, domicilio.id, payload)
       onActualizado(actualizado)
+      toast.exito(`Domicilio #${domicilio.id} actualizado`, `Nuevo estado: ${ESTADO_DOMICILIO[actualizado.estado].etiqueta} · ${ahoraLegible()}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo actualizar el estado.')
+      const mensaje = err instanceof ApiError ? err.message : 'No se pudo actualizar el estado.'
+      setError(mensaje)
+      toast.error('No se pudo actualizar el estado', mensaje)
     } finally {
       setEnviando(false)
     }

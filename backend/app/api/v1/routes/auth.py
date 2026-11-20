@@ -173,6 +173,11 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Demasiados intentos fallidos. Intenta de nuevo en unos minutos.",
             )
+        # El bloqueo ya venció: se empieza de cero. Sin esto el contador quedaba en 5
+        # y un solo error más volvía a bloquear 15 minutos (no eran 5 intentos consecutivos).
+        usuario.intentos_fallidos = 0
+        usuario.bloqueado_hasta = None
+        db.commit()
 
     # Ojo con el short-circuit de "or": si escribiéramos
     # `not usuario or not verify_...(...)`, Python nunca llamaría a

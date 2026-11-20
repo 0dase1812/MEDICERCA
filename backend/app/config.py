@@ -1,5 +1,11 @@
 """Application configuration loaded from environment variables."""
+import os
+import re
+
+from dotenv import dotenv_values
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PATRON_URL_IPS = re.compile(r"^DATABASE_URL_IPS_(\d+)$")
 
 
 class Settings(BaseSettings):
@@ -16,6 +22,10 @@ class Settings(BaseSettings):
 
     # True only for local demo. A deployed environment must apply Alembic migrations.
     auto_create_schema: bool = True
+
+    # Segundos máximos para abrir conexión con una IPS. Sin esto, una IPS caída o sin
+    # respuesta de red deja colgada toda la consulta de disponibilidad.
+    ips_connect_timeout_segundos: int = 3
 
     secret_key: str = "CAMBIA-ESTA-LLAVE-EN-PRODUCCION"
     algorithm: str = "HS256"
@@ -78,11 +88,19 @@ class Settings(BaseSettings):
         The central `ips` table stores an opaque `clave_conexion`; this mapping
         resolves it to a URL that stays in configuration, not in the database.
         """
-        return {
+        registro = {
             "demo_ips_1": self.database_url_ips_1,
             "demo_ips_2": self.database_url_ips_2,
             "demo_ips_3": self.database_url_ips_3,
         }
+        # Cualquier IPS adicional se declara solo con una variable de entorno
+        # DATABASE_URL_IPS_<N> (ej. DATABASE_URL_IPS_4): no hay que tocar código.
+        variables = {**dotenv_values(".env"), **os.environ}
+        for nombre, valor in variables.items():
+            coincide = _PATRON_URL_IPS.match(nombre.upper())
+            if coincide and valor and coincide.group(1) not in ("1", "2", "3"):
+                registro[f"demo_ips_{int(coincide.group(1))}"] = valor
+        return registro
 
     def database_url_for_ips_connection(self, clave_conexion: str) -> str:
         try:

@@ -3,11 +3,13 @@ import { Check, ClipboardCheck, ExternalLink, X } from 'lucide-react'
 import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { formatearFecha } from '../lib/format'
+import { useToast } from '../components/Toast'
+import { ahoraLegible, formatearFecha } from '../lib/format'
 import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, PageHeader } from '../components/ui'
 
 export default function RegenteOrdenesPage() {
   const { usuario } = useAuth()
+  const toast = useToast()
   const [ordenes, setOrdenes] = useState([])
   const [medicamentos, setMedicamentos] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -41,8 +43,11 @@ export default function RegenteOrdenesPage() {
       if (accion === 'aprobar') await ordenesApi.aprobar(usuario.ips_id, orden.id)
       else await ordenesApi.rechazar(usuario.ips_id, orden.id)
       setOrdenes((prev) => prev.filter((o) => o.id !== orden.id))
+      toast.exito(`Orden #${orden.id} ${accion === 'aprobar' ? 'aprobada' : 'rechazada'}`, `El paciente fue notificado · ${ahoraLegible()}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo procesar la orden.')
+      const mensaje = err instanceof ApiError ? err.message : 'No se pudo procesar la orden.'
+      setError(mensaje)
+      toast.error(`No se pudo ${accion} la orden #${orden.id}`, mensaje)
     } finally {
       setProcesando(null)
     }

@@ -58,3 +58,20 @@ export function calcularFechaVigencia(aprobadoEn, duracionDias) {
   fecha.setDate(fecha.getDate() + duracionDias)
   return fecha.toISOString()
 }
+
+/** Fecha y hora actuales ya formateadas, para los avisos de confirmación. */
+export function ahoraLegible() {
+  return formatearFecha(new Date().toISOString())
+}
+
+/** 1.234 -> "1,2 km"; menos de 1 km se muestra en metros ("350 m"). */
+export function formatearDistancia(km) {
+  if (km == null) return '—'
+  if (km < 1) return `${Math.round(km * 1000)} m`
+  return `${km.toFixed(1).replace('.', ',')} km`
+}
+
+/** Enlace "Cómo llegar" a un mapa externo (sin dependencias ni claves de API). */
+export function enlaceMapa(lat, lng) {
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+}

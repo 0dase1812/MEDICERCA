@@ -81,7 +81,7 @@ def test_disponibilidad_agrega_las_tres_ips_y_prioriza_cercania(
     )
 
     assert response.status_code == 200
-    resultados = response.json()
+    resultados = response.json()["resultados"]
     assert [resultado["ips_id"] for resultado in resultados] == [1, 2, 3]
     assert [resultado["nivel"] for resultado in resultados] == [
         "punto_mas_cercano",
@@ -110,7 +110,7 @@ def test_comparacion_de_ciudad_ignora_tildes_y_mayusculas(
     )
 
     assert response.status_code == 200
-    resultados = response.json()
+    resultados = response.json()["resultados"]
     assert [resultado["nivel"] for resultado in resultados] == [
         "punto_mas_cercano",
         "otro_punto_ciudad",
@@ -132,7 +132,7 @@ def test_sin_stock_informa_reabastecimiento_mas_proximo(
     )
 
     assert response.status_code == 200
-    resultados = response.json()
+    resultados = response.json()["resultados"]
     assert [resultado["nivel"] for resultado in resultados] == ["no_disponible"] * 3
     assert resultados[0]["ips_id"] == 2
     assert resultados[0]["fecha_reabastecimiento"] == "2026-08-14"

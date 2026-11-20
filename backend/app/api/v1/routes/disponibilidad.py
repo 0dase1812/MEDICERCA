@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.availability_engine import buscar_disponibilidad
 from app.database import get_db
-from app.schemas.disponibilidad import ConsultaDisponibilidad, ResultadoDisponibilidad
+from app.schemas.disponibilidad import ConsultaDisponibilidad, RespuestaDisponibilidad
 
 router = APIRouter(prefix="/api/v1/disponibilidad", tags=["disponibilidad"])
 
 
-@router.post("", response_model=list[ResultadoDisponibilidad])
+@router.post("", response_model=RespuestaDisponibilidad)
 def consultar(payload: ConsultaDisponibilidad, db_central: Session = Depends(get_db)):
     """
     Consulta las 3 IPS simuladas (bases de datos independientes) y agrega

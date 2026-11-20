@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Beaker, Clock3, FileText, Layers, ListChecks, LocateFixed, MapPin, Package, Search, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Beaker, Clock3, FileText, Layers, ListChecks, LocateFixed, MapPin, Navigation, Package, Search, ShieldAlert } from 'lucide-react'
 import { disponibilidadApi, medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { formatearDuracionTratamiento, NIVEL_DISPONIBILIDAD } from '../lib/format'
+import { enlaceMapa, formatearDistancia, formatearDuracionTratamiento, NIVEL_DISPONIBILIDAD } from '../lib/format'
 import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, EstadoBadge, Input } from '../components/ui'
 
 function useGeolocalizacion() {
@@ -46,6 +46,9 @@ export default function MedicamentoDetallePage() {
   const { ubicacion, error: errorUbicacion, buscando, solicitar } = useGeolocalizacion()
   const [ciudad, setCiudad] = useState('Bogotá')
   const [resultados, setResultados] = useState(null)
+  const [aviso, setAviso] = useState('')
+  const [latManual, setLatManual] = useState('')
+  const [lngManual, setLngManual] = useState('')
   const [errorDisponibilidad, setErrorDisponibilidad] = useState('')
   const [consultando, setConsultando] = useState(false)
 
@@ -61,19 +64,22 @@ export default function MedicamentoDetallePage() {
   const consultarDisponibilidad = async (evento) => {
     evento.preventDefault()
     setErrorDisponibilidad('')
-    if (!ubicacion) {
-      setErrorDisponibilidad('Primero comparte tu ubicación o ingrésala manualmente.')
+    const manual = latManual !== '' && lngManual !== '' ? { lat: Number(latManual), lng: Number(lngManual) } : null
+    const ubicacionFinal = manual || ubicacion
+    if (!ubicacionFinal) {
+      setErrorDisponibilidad('Primero comparte tu ubicación o escribe tu latitud y longitud.')
       return
     }
     setConsultando(true)
     try {
       const datos = await disponibilidadApi.consultar({
         medicamento_id: Number(id),
-        lat_usuario: ubicacion.lat,
-        lng_usuario: ubicacion.lng,
+        lat_usuario: ubicacionFinal.lat,
+        lng_usuario: ubicacionFinal.lng,
         ciudad_usuario: ciudad,
       })
-      setResultados(datos)
+      setResultados(datos.resultados)
+      setAviso(datos.aviso || '')
     } catch (err) {
       setErrorDisponibilidad(err instanceof ApiError ? err.message : 'No se pudo consultar disponibilidad.')
     } finally {
@@ -191,6 +197,12 @@ export default function MedicamentoDetallePage() {
             <LocateFixed className="h-5 w-5" aria-hidden="true" />
             {ubicacion ? 'Actualizar ubicación' : 'Usar mi ubicación'}
           </Button>
+          <div className="w-36">
+            <Input label="Latitud (opc.)" type="number" step="any" value={latManual} onChange={(e) => setLatManual(e.target.value)} />
+          </div>
+          <div className="w-36">
+            <Input label="Longitud (opc.)" type="number" step="any" value={lngManual} onChange={(e) => setLngManual(e.target.value)} />
+          </div>
           <Button type="submit" loading={consultando}>
             <Search className="h-5 w-5" aria-hidden="true" />
             Buscar disponibilidad
@@ -213,6 +225,12 @@ export default function MedicamentoDetallePage() {
           </div>
         )}
 
+        {aviso && (
+          <div className="mt-3">
+            <Alert variant="warning">{aviso}</Alert>
+          </div>
+        )}
+
         {resultados && (
           <div className="mt-7">
             {resultados.length === 0 ? (
@@ -222,12 +240,27 @@ export default function MedicamentoDetallePage() {
                 {resultados.map((resultado, indice) => (
                   <li
                     key={`${resultado.ips_id}-${resultado.punto_id}-${indice}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-slate-100 p-4"
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 p-4 ${
+                      resultado.nivel === 'punto_mas_cercano' ? 'border-brand-500 bg-brand-50' : 'border-slate-100'
+                    }`}
                   >
                     <div>
                       <p className="text-base font-bold text-navy-800">{resultado.punto_nombre}</p>
                       <p className="text-sm text-ink-soft">
-                        {resultado.ciudad} · {resultado.ips_nombre}
+                        {resultado.direccion} · {resultado.ciudad}
+                      </p>
+                      <p className="text-sm text-ink-soft">{resultado.ips_nombre}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-navy-800">
+                        <span>A {formatearDistancia(resultado.distancia_km)}</span>
+                        <a
+                          href={enlaceMapa(resultado.lat, resultado.lng)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-brand-700 hover:underline"
+                        >
+                          <Navigation className="h-4 w-4" aria-hidden="true" />
+                          Cómo llegar
+                        </a>
                       </p>
                       {resultado.fecha_reabastecimiento && (
                         <p className="mt-0.5 text-sm text-ink-soft">Reabastece: {resultado.fecha_reabastecimiento}</p>

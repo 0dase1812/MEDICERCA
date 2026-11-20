@@ -3,11 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, MapPin, XCircle } from 'lucide-react'
 import { domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
-import { ESTADO_DOMICILIO, ESTADOS_DOMICILIO_CANCELABLES, formatearFecha } from '../lib/format'
+import { ahoraLegible, ESTADO_DOMICILIO, ESTADOS_DOMICILIO_CANCELABLES, formatearFecha } from '../lib/format'
+import { useToast } from '../components/Toast'
 import { Alert, Button, Card, CenteredLoader, EstadoBadge } from '../components/ui'
 
 export default function DomicilioDetallePage() {
   const { ipsId, domicilioId } = useParams()
+  const toast = useToast()
   const [domicilio, setDomicilio] = useState(null)
   const [historial, setHistorial] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -38,9 +40,15 @@ export default function DomicilioDetallePage() {
     setCancelando(true)
     try {
       await domiciliosApi.cancelar(ipsId, domicilioId)
+      toast.exito(
+        `Domicilio #${domicilioId} cancelado`,
+        `Cancelado el ${ahoraLegible()}. Tu orden médica quedó libre para pedirlo de nuevo.`,
+      )
       await cargar()
     } catch (err) {
-      setErrorCancelar(err instanceof ApiError ? err.message : 'No se pudo cancelar el domicilio.')
+      const mensaje = err instanceof ApiError ? err.message : 'No se pudo cancelar el domicilio.'
+      setErrorCancelar(mensaje)
+      toast.error('No se pudo cancelar el domicilio', mensaje)
     } finally {
       setCancelando(false)
     }

@@ -20,7 +20,10 @@ from app.config import settings
 from app.core.afiliaciones import cambiar_afiliacion, obtener_ips_activa
 from app.core.security import hash_password
 from app.database import get_db
+from app.ips_db import crear_tablas_ips_registradas
+from app.models.ips import InstitucionPrestadora, TipoIntegracionIPS
 from app.models.usuario import RolUsuario, Usuario
+from app.schemas.ips import IPSCreate, IPSOut
 from app.schemas.usuario import AdminCrearRegenteRequest, UsuarioOut
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -72,3 +75,42 @@ def crear_regente(payload: AdminCrearRegenteRequest, db: Session = Depends(get_d
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+@router.post(
+    "/ips",
+    response_model=IPSOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verificar_admin_key)],
+)
+def registrar_ips(payload: IPSCreate, db: Session = Depends(get_db)):
+    """Registra una IPS nueva en la red SIN tocar código: la fila central guarda solo la
+    clave de conexión; la URL real se declara como variable de entorno DATABASE_URL_IPS_<N>.
+    Los módulos de órdenes, domicilios y disponibilidad la usan sin cambios."""
+    if db.query(InstitucionPrestadora).filter(InstitucionPrestadora.codigo == payload.codigo).first():
+        raise HTTPException(status_code=400, detail="Ya existe una IPS con ese código")
+    if db.query(InstitucionPrestadora).filter(InstitucionPrestadora.nombre_ficticio == payload.nombre_ficticio).first():
+        raise HTTPException(status_code=400, detail="Ya existe una IPS con ese nombre")
+    if db.query(InstitucionPrestadora).filter(InstitucionPrestadora.clave_conexion == payload.clave_conexion).first():
+        raise HTTPException(status_code=400, detail="Esa clave de conexión ya está en uso")
+    if payload.tipo_integracion == TipoIntegracionIPS.BASE_DATOS_DIRECTA:
+        try:
+            settings.database_url_for_ips_connection(payload.clave_conexion)
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail="No hay una URL configurada para esa clave de conexión. Define la variable de entorno DATABASE_URL_IPS_<N> primero.",
+            )
+
+    ips = InstitucionPrestadora(
+        codigo=payload.codigo,
+        nombre_ficticio=payload.nombre_ficticio,
+        clave_conexion=payload.clave_conexion,
+        tipo_integracion=payload.tipo_integracion,
+    )
+    db.add(ips)
+    db.commit()
+    db.refresh(ips)
+    if settings.auto_create_schema and payload.tipo_integracion == TipoIntegracionIPS.BASE_DATOS_DIRECTA:
+        crear_tablas_ips_registradas([ips])
+    return ips

@@ -4,12 +4,15 @@ import { LocateFixed, MapPin, Package, Search, Truck } from 'lucide-react'
 import { disponibilidadApi, domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../components/Toast'
+import { ahoraLegible, enlaceMapa, formatearDistancia } from '../lib/format'
 import { Alert, Button, Card, EmptyState, Input, PageHeader } from '../components/ui'
 
 export default function CrearDomicilioPage() {
   const { usuario } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const toast = useToast()
   const orden = location.state?.orden
   const medicamento = location.state?.medicamento
 
@@ -18,6 +21,7 @@ export default function CrearDomicilioPage() {
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [puntosElegibles, setPuntosElegibles] = useState(null)
   const [puntoSeleccionado, setPuntoSeleccionado] = useState(null)
+  const [aviso, setAviso] = useState('')
   const [error, setError] = useState('')
   const [consultando, setConsultando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
@@ -55,7 +59,7 @@ export default function CrearDomicilioPage() {
     }
     setConsultando(true)
     try {
-      const resultados = await disponibilidadApi.consultar({
+      const respuesta = await disponibilidadApi.consultar({
         medicamento_id: orden.medicamento_id,
         lat_usuario: ubicacion.lat,
         lng_usuario: ubicacion.lng,
@@ -64,7 +68,8 @@ export default function CrearDomicilioPage() {
       // Un domicilio solo puede salir de un punto de venta de TU propia IPS
       // (así lo valida el backend), aunque el buscador de disponibilidad
       // muestre resultados de las 3 IPS simuladas.
-      const propios = resultados.filter((r) => r.ips_id === usuario.ips_id && r.nivel !== 'no_disponible')
+      setAviso(respuesta.aviso || '')
+      const propios = respuesta.resultados.filter((r) => r.ips_id === usuario.ips_id && r.nivel !== 'no_disponible')
       setPuntosElegibles(propios)
       setPuntoSeleccionado(propios[0]?.punto_id ?? null)
     } catch (err) {
@@ -88,9 +93,16 @@ export default function CrearDomicilioPage() {
         punto_origen_id: puntoSeleccionado,
         medicamento_id: orden.medicamento_id,
       })
+      const punto = puntosElegibles.find((p) => p.punto_id === puntoSeleccionado)
+      toast.exito(
+        `Domicilio #${domicilio.id} confirmado`,
+        `Sale de ${punto?.punto_nombre} (${punto?.direccion}) · ${ahoraLegible()}`,
+      )
       navigate(`/domicilios/${usuario.ips_id}/${domicilio.id}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo crear el domicilio.')
+      const mensaje = err instanceof ApiError ? err.message : 'No se pudo crear el domicilio.'
+      setError(mensaje)
+      toast.error('No se pudo confirmar el domicilio', mensaje)
     } finally {
       setConfirmando(false)
     }
@@ -133,6 +145,12 @@ export default function CrearDomicilioPage() {
           </div>
         )}
 
+        {aviso && (
+          <div className="mt-4">
+            <Alert variant="warning">{aviso}</Alert>
+          </div>
+        )}
+
         {puntosElegibles && (
           <div className="mt-7">
             {puntosElegibles.length === 0 ? (
@@ -160,7 +178,20 @@ export default function CrearDomicilioPage() {
                       />
                       <div>
                         <p className="text-base font-bold text-navy-800">{punto.punto_nombre}</p>
-                        <p className="text-sm text-ink-soft">{punto.ciudad}</p>
+                        <p className="text-sm text-ink-soft">
+                          {punto.direccion} · {punto.ciudad}
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-navy-800">
+                          A {formatearDistancia(punto.distancia_km)} ·{' '}
+                          <a
+                            href={enlaceMapa(punto.lat, punto.lng)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand-700 hover:underline"
+                          >
+                            Ver en el mapa
+                          </a>
+                        </p>
                       </div>
                     </div>
                     <span className="text-sm font-semibold text-ink-soft">Stock: {punto.cantidad}</span>

@@ -204,6 +204,13 @@ curso.
 (un solo archivo, `app/seed.py`) y confirmar CI verde — si estás leyendo
 esto en una sesión posterior, primero confirma si ya se hizo.
 
+### Sesión 9 — escenarios de calidad (seguridad, modificabilidad, disponibilidad, usabilidad x3)
+Ver `docs/ESCENARIOS_CALIDAD.md` y `backend/tests/test_escenarios_calidad.py`. Cambios de código:
+bloqueo de login que reinicia el contador al vencer; registro de IPS leído de `DATABASE_URL_IPS_<N>` +
+`POST /admin/ips`; `/disponibilidad` ahora responde `{resultados, ips_no_disponibles, aviso}` (antes una
+lista) con timeout de conexión y datos de dirección/distancia/coordenadas; correo al crear/cancelar un
+domicilio; avisos (toast) verde/rojo en el frontend. **96 tests pasan** (el número de la Sesión 1-8 quedó viejo).
+
 ## Pendiente por hacer (en orden de prioridad sugerido)
 
 ### 1. Capa de servicios (mejora estructural, no urgente)

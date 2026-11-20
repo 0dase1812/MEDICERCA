@@ -1,4 +1,5 @@
 """Interoperability gateway: aggregate availability from registered IPS systems."""
+import logging
 import math
 import unicodedata
 from abc import ABC, abstractmethod
@@ -8,7 +9,9 @@ from sqlalchemy.orm import Session
 from app.ips_db import ips_session
 from app.models.ips import InstitucionPrestadora
 from app.models_ips import Inventario, PuntoVenta
-from app.schemas.disponibilidad import ResultadoDisponibilidad
+from app.schemas.disponibilidad import IPSNoDisponible, RespuestaDisponibilidad, ResultadoDisponibilidad
+
+logger = logging.getLogger(__name__)
 
 
 class CalculadorDistancia(ABC):
@@ -79,37 +82,61 @@ def buscar_disponibilidad(
     lng_usuario: float,
     ciudad_usuario: str,
     calculador: CalculadorDistancia = calculador_distancia_por_defecto,
-) -> list[ResultadoDisponibilidad]:
+) -> RespuestaDisponibilidad:
     ips_activas = db_central.query(InstitucionPrestadora).filter(InstitucionPrestadora.activa.is_(True)).all()
     todas: list[tuple[InstitucionPrestadora, Inventario, PuntoVenta]] = []
+    no_disponibles: list[IPSNoDisponible] = []
     for ips in ips_activas:
         if ips.tipo_integracion.value != "base_datos_directa" or not ips.clave_conexion:
             continue
-        for inventario, punto in _consultar_una_ips(ips, medicamento_id):
+        # Aislamiento de fallas: si UNA IPS no responde, las demás siguen aportando resultados.
+        try:
+            filas = _consultar_una_ips(ips, medicamento_id)
+        except Exception:
+            logger.exception("La IPS %s no respondió a la consulta de disponibilidad", ips.codigo)
+            no_disponibles.append(IPSNoDisponible(ips_id=ips.id, ips_nombre=ips.nombre_ficticio))
+            continue
+        for inventario, punto in filas:
             todas.append((ips, inventario, punto))
+
+    def distancia(fila) -> float:
+        return calculador.distancia_km(lat_usuario, lng_usuario, float(fila[2].lat), float(fila[2].lng))
 
     con_stock = [fila for fila in todas if fila[1].cantidad > 0]
     if con_stock:
         ciudad_usuario_normalizada = _normalizar_ciudad(ciudad_usuario)
         misma_ciudad = [fila for fila in con_stock if _normalizar_ciudad(fila[2].ciudad) == ciudad_usuario_normalizada]
         otra_ciudad = [fila for fila in con_stock if _normalizar_ciudad(fila[2].ciudad) != ciudad_usuario_normalizada]
-        misma_ciudad.sort(
-            key=lambda fila: calculador.distancia_km(lat_usuario, lng_usuario, float(fila[2].lat), float(fila[2].lng))
-        )
-        resultados = [_a_resultado(ips, inv, punto, "punto_mas_cercano" if i == 0 else "otro_punto_ciudad") for i, (ips, inv, punto) in enumerate(misma_ciudad)]
-        return resultados + [_a_resultado(ips, inv, punto, "otra_ciudad") for ips, inv, punto in otra_ciudad]
+        misma_ciudad.sort(key=distancia)
+        resultados = [
+            _a_resultado(ips, inv, punto, "punto_mas_cercano" if i == 0 else "otro_punto_ciudad", distancia((ips, inv, punto)))
+            for i, (ips, inv, punto) in enumerate(misma_ciudad)
+        ]
+        resultados += [_a_resultado(ips, inv, punto, "otra_ciudad", distancia((ips, inv, punto))) for ips, inv, punto in otra_ciudad]
+    else:
+        todas.sort(key=lambda fila: (fila[1].fecha_reabastecimiento is None, fila[1].fecha_reabastecimiento))
+        resultados = [_a_resultado(ips, inv, punto, "no_disponible", distancia((ips, inv, punto))) for ips, inv, punto in todas]
 
-    todas.sort(key=lambda fila: (fila[1].fecha_reabastecimiento is None, fila[1].fecha_reabastecimiento))
-    return [_a_resultado(ips, inv, punto, "no_disponible") for ips, inv, punto in todas]
+    aviso = None
+    if no_disponibles:
+        nombres = ", ".join(ips.ips_nombre for ips in no_disponibles)
+        aviso = f"Algunas IPS están temporalmente fuera de servicio y no aparecen en los resultados: {nombres}."
+    return RespuestaDisponibilidad(resultados=resultados, ips_no_disponibles=no_disponibles, aviso=aviso)
 
 
-def _a_resultado(ips: InstitucionPrestadora, inventario: Inventario, punto: PuntoVenta, nivel: str) -> ResultadoDisponibilidad:
+def _a_resultado(
+    ips: InstitucionPrestadora, inventario: Inventario, punto: PuntoVenta, nivel: str, distancia_km: float
+) -> ResultadoDisponibilidad:
     return ResultadoDisponibilidad(
         ips_id=ips.id,
         ips_nombre=ips.nombre_ficticio,
         punto_id=punto.id,
         punto_nombre=punto.nombre,
         ciudad=punto.ciudad,
+        direccion=punto.direccion,
+        lat=float(punto.lat),
+        lng=float(punto.lng),
+        distancia_km=round(distancia_km, 2),
         cantidad=inventario.cantidad,
         fecha_reabastecimiento=inventario.fecha_reabastecimiento,
         nivel=nivel,

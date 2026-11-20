@@ -74,6 +74,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Ejemplo: IPS nueva (escenario de modificabilidad). Descomentar junto con
+  # DATABASE_URL_IPS_4 en backend/.env y registrar con POST /api/v1/admin/ips ---
+  # db_ips4:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: medicerca
+  #     POSTGRES_PASSWORD: medicerca
+  #     POSTGRES_DB: ips4
+  #   ports:
+  #     - "5436:5432"
+  #   volumes:
+  #     - db_ips4_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U medicerca -d ips4"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
   backend:
     build:
       context: ../backend
@@ -106,3 +125,4 @@ volumes:
   db_ips1_data:
   db_ips2_data:
   db_ips3_data:
+  # db_ips4_data:

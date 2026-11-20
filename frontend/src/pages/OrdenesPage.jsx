@@ -4,7 +4,8 @@ import { FileCheck2, FileText, Link2, Plus, Truck, Upload } from 'lucide-react'
 import { domiciliosApi, medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { ESTADO_DOMICILIO, ESTADO_ORDEN, formatearFecha } from '../lib/format'
+import { useToast } from '../components/Toast'
+import { ahoraLegible, ESTADO_DOMICILIO, ESTADO_ORDEN, formatearFecha } from '../lib/format'
 import { comprimirImagenSiAplica } from '../lib/imagen'
 import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
 
@@ -99,6 +100,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
 
 export default function OrdenesPage() {
   const { usuario } = useAuth()
+  const toast = useToast()
   const location = useLocation()
   const navigate = useNavigate()
   const [ordenes, setOrdenes] = useState([])
@@ -158,6 +160,7 @@ export default function OrdenesPage() {
           medicamentoIdInicial={location.state?.medicamentoId}
           onCreada={(nueva) => {
             setOrdenes((prev) => [nueva, ...prev])
+            toast.exito(`Orden #${nueva.id} cargada`, `Quedó pendiente de revisión por un regente de tu IPS · ${ahoraLegible()}`)
             setMostrarFormulario(false)
           }}
         />
