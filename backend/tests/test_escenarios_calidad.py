@@ -401,6 +401,9 @@ def test_usab1_un_domicilio_en_camino_ya_no_se_puede_cancelar_y_el_mensaje_es_cl
 ) -> None:
     d = _domicilio_confirmado(client, db_session, ips_db, token_factory, cedula="2222222221", sufijo="U1B")
     regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    client.patch(
+        f"/api/v1/domicilios/1/{d['domicilio_id']}/estado", json={"estado": "en_alistamiento"}, headers=regente
+    )
     client.patch(f"/api/v1/domicilios/1/{d['domicilio_id']}/estado", json={"estado": "en_camino"}, headers=regente)
 
     respuesta = client.post(f"/api/v1/domicilios/1/{d['domicilio_id']}/cancelar", headers=d["headers"])
