@@ -24,6 +24,8 @@ from app.models.usuario import RolUsuario, Usuario
 from app.schemas.usuario import (
     ConfirmarCambioPasswordRequest,
     LoginRequest,
+    ReenviarCodigoOut,
+    ReenviarCodigoRequest,
     RegistroOut,
     SolicitarCambioPasswordOut,
     SolicitarCambioPasswordRequest,
@@ -114,6 +116,43 @@ def verificar_registro(request: Request, payload: VerificarCodigoRequest, db: Se
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+@router.post("/reenviar-codigo", response_model=ReenviarCodigoOut)
+@limiter.limit("5/minute")
+def reenviar_codigo(request: Request, payload: ReenviarCodigoRequest, db: Session = Depends(get_db)):
+    """Sprint 3 (HU-S3-05): reenvia un codigo OTP vencido o no recibido, para
+    no obligar al usuario a reiniciar el registro o el cambio de contraseña
+    desde cero. Mismo limite de 5/minuto por IP que ya protege
+    `solicitar-cambio-password` (el endpoint mas parecido: tambien genera y
+    envia un codigo sin que el usuario este autenticado), para no abrir una
+    puerta de abuso de envio de correos.
+
+    Responde siempre el mismo mensaje genérico, exista o no el correo, y
+    reutiliza directamente app.core.otp.generar_codigo (invalida el codigo
+    anterior y crea uno nuevo) en vez de inventar un mecanismo aparte."""
+    mensaje = "Si el correo existe y aplica, se envió un nuevo código de verificación."
+    usuario = db.query(Usuario).filter(Usuario.correo == payload.correo).first()
+    if not usuario:
+        return ReenviarCodigoOut(mensaje=mensaje)
+    # Reenviar un código de registro a una cuenta ya verificada no tiene
+    # sentido (ya no hay nada que confirmar) — se trata igual que "no existe"
+    # para no revelar el estado de verificación de la cuenta.
+    if payload.proposito == PropositoCodigo.REGISTRO and usuario.verificado:
+        return ReenviarCodigoOut(mensaje=mensaje)
+
+    codigo = generar_codigo(db, correo=usuario.correo, proposito=payload.proposito)
+    asunto = (
+        "Confirma tu cuenta en MediCerca"
+        if payload.proposito == PropositoCodigo.REGISTRO
+        else "Código para cambiar tu contraseña en MediCerca"
+    )
+    enviar_correo(
+        usuario.correo,
+        asunto,
+        f"<p>Tu nuevo código de verificación es: <strong>{codigo}</strong></p>",
+    )
+    return ReenviarCodigoOut(mensaje=mensaje, codigo_demo=_codigo_demo(codigo))
 
 
 @router.post("/login", response_model=Token)

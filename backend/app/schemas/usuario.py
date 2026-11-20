@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from app.core.security import validar_fortaleza_password
+from app.models.codigo_verificacion import PropositoCodigo
 from app.models.usuario import RolUsuario
 
 
@@ -70,6 +71,18 @@ class ConfirmarCambioPasswordRequest(BaseModel):
     @classmethod
     def _validar_password(cls, v: str) -> str:
         return validar_fortaleza_password(v)
+
+
+class ReenviarCodigoRequest(BaseModel):
+    """Sprint 3 (HU-S3-05): reenvio de un codigo OTP vencido o no recibido,
+    para registro o cambio de contraseña."""
+    correo: EmailStr
+    proposito: PropositoCodigo
+
+
+class ReenviarCodigoOut(BaseModel):
+    mensaje: str
+    codigo_demo: str | None = None  # solo se llena en modo "simulado"; en modo "real" queda en None
 
 
 class LoginRequest(BaseModel):

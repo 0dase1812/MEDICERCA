@@ -112,7 +112,15 @@ def test_flujo_completo_registro_hasta_domicilio_entregado(
     assert domicilio.json()["estado"] == "confirmado"
     domicilio_id = domicilio.json()["id"]
 
-    # 8. El regente actualiza el estado logistico hasta la entrega.
+    # 8. El regente actualiza el estado logistico hasta la entrega, pasando
+    # por cada paso de la secuencia (confirmado -> en_alistamiento -> en_camino).
+    en_alistamiento = client.patch(
+        f"/api/v1/domicilios/1/{domicilio_id}/estado",
+        json={"estado": "en_alistamiento"},
+        headers=regente_headers,
+    )
+    assert en_alistamiento.status_code == 200
+
     en_camino = client.patch(
         f"/api/v1/domicilios/1/{domicilio_id}/estado",
         json={"estado": "en_camino", "lat_actual": 4.679, "lng_actual": -74.051},
@@ -135,11 +143,11 @@ def test_flujo_completo_registro_hasta_domicilio_entregado(
     assert seguimiento.json()["estado"] == "entregado"
 
     # 10. El historial completo del pedido queda registrado en orden cronologico:
-    # confirmado (al crear) -> en_camino -> entregado. Cada cambio de estado
-    # queda como fila propia, ninguna se sobrescribe.
+    # confirmado (al crear) -> en_alistamiento -> en_camino -> entregado. Cada
+    # cambio de estado queda como fila propia, ninguna se sobrescribe.
     historial = client.get(f"/api/v1/domicilios/1/{domicilio_id}/historial", headers=paciente_headers)
     assert historial.status_code == 200
     estados = [fila["estado"] for fila in historial.json()]
-    assert estados == ["confirmado", "en_camino", "entregado"]
-    # El punto intermedio quedo con las coordenadas que mando el regente en ese momento.
-    assert historial.json()[1]["lat_actual"] == 4.679
+    assert estados == ["confirmado", "en_alistamiento", "en_camino", "entregado"]
+    # El punto "en_camino" quedo con las coordenadas que mando el regente en ese momento.
+    assert historial.json()[2]["lat_actual"] == 4.679

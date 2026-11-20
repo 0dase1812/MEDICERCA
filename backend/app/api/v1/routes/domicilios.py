@@ -14,6 +14,22 @@ from app.schemas.pedido import DomicilioCreate, DomicilioEstadoUpdate, Domicilio
 
 router = APIRouter(prefix="/api/v1/domicilios", tags=["domicilios"])
 
+# Sprint 3 (HU-S3-06): secuencia logica valida de un domicilio. Antes de
+# esto, PATCH /{ips_id}/{domicilio_id}/estado aceptaba CUALQUIER estado
+# del payload sin verificar de donde venia (ej. saltar de CONFIRMADO
+# directo a ENTREGADO), lo que podia romper el historial de seguimiento
+# que ve el paciente y confundirlo. ENTREGADO y CANCELADO son terminales:
+# no tienen salida. La cancelacion via PATCH queda disponible desde
+# CONFIRMADO/EN_ALISTAMIENTO para el regente, igual que el endpoint
+# dedicado POST .../cancelar lo permite para el paciente.
+TRANSICIONES_VALIDAS: dict[EstadoDomicilio, set[EstadoDomicilio]] = {
+    EstadoDomicilio.CONFIRMADO: {EstadoDomicilio.EN_ALISTAMIENTO, EstadoDomicilio.CANCELADO},
+    EstadoDomicilio.EN_ALISTAMIENTO: {EstadoDomicilio.EN_CAMINO, EstadoDomicilio.CANCELADO},
+    EstadoDomicilio.EN_CAMINO: {EstadoDomicilio.ENTREGADO},
+    EstadoDomicilio.ENTREGADO: set(),
+    EstadoDomicilio.CANCELADO: set(),
+}
+
 
 def _obtener_domicilio_del_usuario(db_central: Session, usuario: Usuario, ips_id: int, domicilio_id: int):
     ips = exigir_ips_del_usuario(db_central, usuario, ips_id)
@@ -208,6 +224,15 @@ def actualizar_estado(
         domicilio = db.get(Domicilio, domicilio_id)
         if not domicilio:
             raise HTTPException(status_code=404, detail="Domicilio no encontrado")
+        if payload.estado not in TRANSICIONES_VALIDAS.get(domicilio.estado, set()):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"No se puede pasar de '{domicilio.estado.value}' a '{payload.estado.value}'. "
+                    "La secuencia valida es confirmado -> en_alistamiento -> en_camino -> entregado "
+                    "(o cancelado desde confirmado/en_alistamiento)."
+                ),
+            )
         domicilio.estado = payload.estado
         if payload.lat_actual is not None:
             domicilio.lat_actual = payload.lat_actual

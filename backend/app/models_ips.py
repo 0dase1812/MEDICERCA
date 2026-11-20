@@ -71,6 +71,30 @@ class PrescripcionActiva(IPSBase):
     historia: Mapped["HistoriaClinica"] = relationship(back_populates="prescripciones")
 
 
+class HistorialHistoriaClinica(IPSBase):
+    """Registro append-only de cada creación, edición o retiro de un
+    diagnóstico o una prescripción (Sprint 3, HU-S3-02). Igual que
+    HistorialEstadoDomicilio/HistorialEstadoOrden: nunca se edita ni se
+    borra una fila existente, solo se agregan nuevas — así se puede
+    sustentar ante una auditoría qué cambió, quién lo hizo y cuándo, ya
+    que la historia clínica es información sensible."""
+    __tablename__ = "historial_historia_clinica"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    historia_id: Mapped[int] = mapped_column(ForeignKey("historia_clinica.id"), index=True)
+    # "diagnostico" o "prescripcion". entidad_id queda en None para el
+    # diagnóstico (vive directo en HistoriaClinica, sin id propio que auditar).
+    entidad: Mapped[str] = mapped_column(String(20))
+    entidad_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    accion: Mapped[str] = mapped_column(String(20))  # "creacion" | "edicion" | "retiro"
+    valor_anterior: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valor_nuevo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nombre del regente que hizo el cambio (mismo criterio que
+    # OrdenMedica.revisado_por: usuario.nombre, no su correo ni cédula).
+    autor: Mapped[str] = mapped_column(String(120))
+    registrado_en: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class EstadoOrden(str, enum.Enum):
     PENDIENTE = "pendiente"
     APROBADA = "aprobada"

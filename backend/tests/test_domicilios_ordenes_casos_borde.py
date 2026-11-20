@@ -284,6 +284,7 @@ def test_no_se_puede_cancelar_un_domicilio_ya_en_camino(
     domicilio_id = creado.json()["id"]
 
     regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "en_alistamiento"}, headers=regente)
     client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "en_camino"}, headers=regente)
 
     respuesta = client.post(f"/api/v1/domicilios/1/{domicilio_id}/cancelar", headers=paciente)
@@ -341,6 +342,11 @@ def test_actualizar_estado_domicilio_requiere_rol_regente(
     assert paciente_intenta.status_code == 403
 
     regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    client.patch(
+        f"/api/v1/domicilios/1/{domicilio_id}/estado",
+        json={"estado": "en_alistamiento"},
+        headers=regente,
+    )
     actualizado = client.patch(
         f"/api/v1/domicilios/1/{domicilio_id}/estado",
         json={"estado": "en_camino", "lat_actual": 4.65, "lng_actual": -74.06},
@@ -433,6 +439,8 @@ def test_domicilios_activos_solo_para_regente_y_excluye_entregados(
     assert activos.status_code == 200
     assert any(d["id"] == domicilio_id for d in activos.json())
 
+    client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "en_alistamiento"}, headers=regente)
+    client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "en_camino"}, headers=regente)
     client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "entregado"}, headers=regente)
 
     activos_despues = client.get("/api/v1/domicilios/activos", headers=regente)

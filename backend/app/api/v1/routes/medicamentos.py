@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,14 +18,30 @@ def listar(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    q: str | None = Query(
+        None,
+        min_length=1,
+        description="Busca por coincidencia parcial (sin distinguir mayusculas/minusculas) en el "
+        "nombre generico o el nombre comercial. No distingue tildes.",
+    ),
 ):
     """Catálogo público (nacional/INVIMA): no requiere login.
 
     Paginado por `skip`/`limit` en vez de devolver la tabla completa: con
     datos demo no importa, pero un catálogo real (INVIMA) puede tener miles
-    de registros."""
-    total = db.query(Medicamento).count()
-    registros = db.query(Medicamento).order_by(Medicamento.id).offset(skip).limit(limit).all()
+    de registros.
+
+    Sprint 3 (HU-S3-04): `q` filtra por nombre antes de paginar, para que el
+    paciente no tenga que recorrer paginas ordenadas solo por id buscando un
+    medicamento puntual."""
+    consulta = db.query(Medicamento)
+    if q:
+        patron = f"%{q}%"
+        consulta = consulta.filter(
+            or_(Medicamento.nombre_generico.ilike(patron), Medicamento.nombre_comercial.ilike(patron))
+        )
+    total = consulta.count()
+    registros = consulta.order_by(Medicamento.id).offset(skip).limit(limit).all()
     return Pagina(items=registros, total=total, skip=skip, limit=limit)
 
 
