@@ -23,3 +23,8 @@
 .idea/
 .DS_Store
 Thumbs.db
+
+# Resultados de pruebas de rendimiento (perf/) — se regeneran en cada corrida,
+# no se versionan. El .jmx y el CSV de plantilla de usuarios sí se versionan.
+perf/results/*
+!perf/results/.gitkeep
